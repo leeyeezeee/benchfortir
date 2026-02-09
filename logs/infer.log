@@ -1,0 +1,14 @@
+{'endpoints': ['http://localhost:8001/v1', 'http://localhost:8002/v1', 'http://localhost:8003/v1', 'http://localhost:8004/v1'], 'model_path': '/root/autodl-tmp/model/Qwen3-4B', 'api_keys': None, 'default_model': 'Qwen3-4B', 'temperature': 1.0, 'max_tokens': 4096, 'top_p': 0.95, 'top_k': 20, 'min_p': 0.0, 'repetition_penalty': 1.1, 'include_stop_str_in_output': True, 'max_concurrent_requests': 50, 'dataset_name': 'aime25', 'output_path': '/root/autodl-tmp/results', 'prompt_type': 'base', 'counts': 500, 'data_path': 'data', 'max_python_times': 0, 'max_search_times': 0, 'sample_timeout': 900, 'use_sds': False, 'conda_path': '/root/miniconda3/', 'conda_env': 'pythontool', 'python_max_concurrent': 32, 'bing_api_key': '', 'bing_zone': 'serp_api1', 'search_max_results': 5, 'search_result_length': 1000, 'bing_requests_per_second': 32.0, 'bing_max_retries': 3, 'bing_retry_delay': 1.0, 'summ_model_urls': ['http://localhost:8020/v1'], 'summ_model_name': 'Qwen2.5-7B-Instruct', 'summ_model_path': '/path/to/Qwen2.5-7B-Instruct', 'search_cache_file': '/path/to/search_cache.db', 'url_cache_file': '/path/to/search_url_cache.db', 'use_local_search': True, 'local_search_url': '0.0.0.0:1243', 'max_sequence_length': 20000, 'compatible_search': True}
+INFO 12-20 16:12:01 [__init__.py:239] Automatically detected platform cuda.
+http://localhost:8001/v1
+http://localhost:8002/v1
+http://localhost:8003/v1
+http://localhost:8004/v1
+Initialized vllm clients pool with 4 endpoints
+http://localhost:8020/v1
+Initialized vllm clients pool with 1 endpoints
+Initialized AsyncInference...
+>>> Inference dataset: 
+Loading dataset from data/aime25/test.jsonl
+Loading 30 samples from data/aime25/test.jsonl...
+Total examples: 30, Max concurrent requests: 50
