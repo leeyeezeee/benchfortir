@@ -1,4 +1,5 @@
 #!/bin/bash
+TOKENIZER_PATH="/path/to/your/model"
 
 # Change to the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -35,6 +36,11 @@ if [ "$USE_LLM" = true ]; then
     if [ ! -z "$MODEL_NAME" ]; then
         CMD+=" --model_name $MODEL_NAME"
     fi
+fi
+
+# 算 token：如果设置了 tokenizer 路径就加上
+if [ -n "$TOKENIZER_PATH" ]; then
+  CMD+=" --tokenizer_path $TOKENIZER_PATH"
 fi
 
 # Execute command
