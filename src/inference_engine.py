@@ -281,14 +281,14 @@ class AsyncInference:
                 processed = completed
             await asyncio.sleep(0.1)
         pbar.close()
-        await task_queue.join()  # 等待所有任务完成
+        await task_queue.join()  # 等6待所有任务完成
         # 取消所有worker任务
         for w in workers:
             w.cancel()
         await asyncio.gather(*workers, return_exceptions=True)
         end_time = time.time()
         print(f"Total Time: {(end_time - start_time) / 60:.2f}min")
-        # 保存结果到json文件
+     # 保存结果到json文件
         output_file = os.path.join(
                     self.args.output_path,
                     f"{self.args.dataset_name}_output.json",

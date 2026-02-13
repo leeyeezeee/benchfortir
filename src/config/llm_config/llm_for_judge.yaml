@@ -1,0 +1,18 @@
+# LLM configuration
+llm_name: qwen_judge
+default_model: Qwen3-4B
+temperature: 0.0
+max_tokens: 1024
+top_p: 0.9
+repetition_penalty: 1.0
+include_stop_str_in_output: True
+max_concurrent_requests: 50
+
+# Remote LLM / vLLM configuration
+vllm:
+  remote: true
+  # 请将下面的占位符替换为实际评测用大模型的服务地址和 API Key
+  endpoints:
+    - https://your-judge-llm-endpoint/v1
+  api_keys:
+    - YOUR_API_KEY_HERE

@@ -1,0 +1,11 @@
+# ========== 评测配置（配合 dataset_config/example.yaml 使用） ==========
+# 实际传给 evaluate.py 的 output_path 由脚本根据
+#   {output_path}/{dataset_name}_output.json
+# 推导得到，这里不再重复配置路径。
+
+task: math            # 评测任务类型：math | qa
+use_llm: false        # 是否使用 LLM 做等价性评估
+api_base_url: null    # 用 LLM 评测时的 API base URL（如 http://localhost:8001/v1）
+model_name: null      # 用 LLM 评测时的模型名（如 Qwen2.5-72B-Instruct）
+concurrent_limit: 50  # 最大并发评测样本数
+timeout: 1800         # 整体评测超时（秒）

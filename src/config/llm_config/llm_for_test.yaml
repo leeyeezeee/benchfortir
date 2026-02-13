@@ -1,0 +1,33 @@
+# src/config/llm_config/llm_for_test.yaml
+
+# ===== LLM configuration（推理时可复用）=====
+llm_name: qwen3                      # 原来的 llm_nmae，注意修正拼写
+model_path: /root/autodl-tmp/model/Qwen3-4B
+default_model: Qwen3-4B              # vLLM serve 的 --served-model-name，推理时也用这个
+
+temperature: 1.0
+max_tokens: 4096
+top_p: 0.95
+top_k: 20
+min_p: 0.0
+repetition_penalty: 1.1
+include_stop_str_in_output: True
+max_concurrent_requests: 50          # 对应 infer 的 --max_concurrent_requests
+
+# ===== vLLM serve configuration =====
+vllm:
+  remote: false                      # false 表示本地起 vLLM，true 表示用远程已有服务
+
+  # 本地部署相关
+  host: 0.0.0.0
+  port: 8001
+  gpu_ids: "0"                       # 映射到 CUDA_VISIBLE_DEVICES
+  tensor_parallel_size: 1
+  max_model_len: 32768               # --max-model-len
+  gpu_memory_utilization: 0.9
+  max_logprobs: 100                  # 可选，对应 --max-logprobs
+  extra_args: []                     # 可选，额外透传到 vllm serve 的参数列表
+
+  # 远程模式相关（remote: true 时才用，可选）
+  endpoints: []                      # 例如 ["https://api.xxx.com/v1"]
+  api_keys: []                       # 与 endpoints 一一对应

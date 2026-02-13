@@ -1,0 +1,22 @@
+# ========== 数据集配置（infer 推理时使用的全部数据集相关参数） ==========
+# 数据文件路径规则：{data_path}/{dataset_name}/test.jsonl
+
+dataset_name: math
+data_path: /root/autodl-tmp/data   # 数据集根目录，与 dataset_name 拼接为 .../dataset_name/test.jsonl
+output_path: /root/autodl-tmp/results   # 推理结果写入目录，输出文件为 {output_path}/{dataset_name}_output.json
+counts: 100                         # 最多使用的样本数（0 或足够大表示全部）
+prompt_type: code_search            # 与 dataset 匹配的 prompt：code_search | search | math | base | code_search_cn | gemini | claude | react
+sample_timeout: 120                 # 单样本推理超时（秒）
+# 未来支持的参数列表写在这里供eval加载
+# ----- 支持的 dataset_name（DataLoader 按名称解析字段） -----
+# aime, amc23, gsm8k, tabmwp, gaokao2023en, college_math  → question/problem, answer
+# svamp, asdiv            → body/Body + question/Question, answer/Answer
+# mawps                   → input, target
+# carp_en                  → content, answer
+# minerva_math             → problem, solution（取 \boxed{}）
+# olympiadbench            → question, final_answer[0]
+# math, aime25             → problem, answer
+# gaia                     → Question, answer
+# csbench                  → Question, Answer, Format, A/B/C/D（选择题）
+# mmlu-pro                 → question, answer, options（多选）
+# 其他                     → question, answer
