@@ -143,7 +143,9 @@ from .metrics import (
     compute_f1_score,
 )
 from .math_equivalence import is_equiv
-from .llm_evaluator_sds import LLMEvaluator
+from .llm_evaluators.llm_evaluator_sds import LLMEvaluator
+from .llm_evaluators.llm_evaluator_expo import LLMEvaluatorExpo
+from .llm_evaluators.llm_evaluator_inter import LLMEvaluatorInter
 from .utils import extract_answer
 
 try:
@@ -216,15 +218,30 @@ class Evaluator:
                 print(f"Warning: failed to load tokenizer from {tokenizer_name_or_path}: {e}")
                 self.tokenizer = None
 
-        # Optional LLM evaluator
+        # Optional LLM evaluator (LLMEvaluatorExpo for expodesign, LLMEvaluator for qa/math)
         self.llm_evaluator = None
         if self.use_llm:
-            self.llm_evaluator = LLMEvaluator(
-                api_base_url=api_base_url,
-                model_name=model_name,
-                api_key=api_key,
-                concurrent_limit=concurrent_limit,
-            )
+            if self.task_type == "expodesign":
+                self.llm_evaluator = LLMEvaluatorExpo(
+                    api_base_url=api_base_url,
+                    model_name=model_name,
+                    api_key=api_key,
+                    concurrent_limit=concurrent_limit,
+                )
+            elif self.task_type == "interaction":
+                self.llm_evaluator = LLMEvaluatorInter(
+                    api_base_url=api_base_url,
+                    model_name=model_name,
+                    api_key=api_key,
+                    concurrent_limit=concurrent_limit,
+                )
+            else:
+                self.llm_evaluator = LLMEvaluator(
+                    api_base_url=api_base_url,
+                    model_name=model_name,
+                    api_key=api_key,
+                    concurrent_limit=concurrent_limit,
+                )
 
     # ------------------------------
     # Token / cost helpers
@@ -444,18 +461,42 @@ class Evaluator:
         elif self.task_type == "qa":
             metrics.update(evaluate_qa_prediction(prediction, answer))
             score_for_eff = metrics.get("f1", 0.0)
+        elif self.task_type == "expodesign":
+            score_for_eff = 0.0
+            if self.use_llm and self.llm_evaluator:
+                semaphore = asyncio.Semaphore(self.concurrent_limit)
+                is_correct, llm_reason_answer = await self.llm_evaluator.evaluate(
+                    question=question,
+                    labeled_answer=answer,
+                    pred_answer=prediction,
+                    semaphore=semaphore,
+                )
+                metrics["llm_equal"] = int(is_correct)
+                metrics["llm_response"] = llm_reason_answer
+                try:
+                    judge_json = json.loads(llm_reason_answer)
+                    metrics["expo_scores"] = judge_json.get("scores", {})
+                    metrics["expo_overall_score"] = judge_json.get("overall_score")
+                    metrics["expo_rationales"] = judge_json.get("rationales", {})
+                    metrics["expo_flags"] = judge_json.get("flags", {})
+                    overall = judge_json.get("overall_score")
+                    if overall is not None:
+                        score_for_eff = float(overall)
+                except (json.JSONDecodeError, TypeError):
+                    pass
         else:
             raise ValueError(f"Unsupported task type: {self.task_type}")
 
         # New TIR per-sample metrics
-        metrics["reasoning_answer_consistency"] = self._reasoning_consistency(output or "", prediction)
-        metrics["tool_supported"] = self._tool_supported(output or "", prediction)
+        if self.task_type != "expodesign":
+            metrics["reasoning_answer_consistency"] = self._reasoning_consistency(output or "", prediction)
+            metrics["tool_supported"] = self._tool_supported(output or "", prediction)
+            metrics["score_for_efficiency"] = float(score_for_eff)  # internal helper
         metrics["token_count"] = self._count_tokens(instruction, question, output)
         metrics["time_total_sec"] = (item.get("timing", {}) or {}).get("total_time", None)
-        metrics["score_for_efficiency"] = float(score_for_eff)  # internal helper
 
         # Optional LLM judge
-        if self.use_llm and self.llm_evaluator:
+        if self.use_llm and self.llm_evaluator and self.task_type in ["qa", "math"]:
             semaphore = asyncio.Semaphore(self.concurrent_limit)
             is_correct, llm_reason_answer = await self.llm_evaluator.evaluate(
                 question=question,
@@ -467,7 +508,133 @@ class Evaluator:
             metrics["llm_response"] = llm_reason_answer
 
         return metrics
+    async def evaluate_sample_inter(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Evaluate a single interaction record (one dialogue trajectory)
+        produced by AsyncInteractionInference / SampleProcessorInter.
 
+        Expected item schema (see processors/sample_processor_inter.py):
+            {
+            "scenario_id": ...,
+            "category": ...,
+            "title": ...,
+            "product_name": ...,
+            "product_domain": ...,
+            "max_turns": int,
+            "customer_satisfied": bool,
+            "customer_score": int,
+            "customer_reason": str,
+            "dialogue": [...],     # list of messages (role/content/tool_trace/customer_meta...)
+            "agent_model": str,
+            "ts": int,
+            ...
+            }
+        """
+        dialogue = item.get("dialogue", []) or []
+        customer_satisfied = bool(item.get("customer_satisfied", False))
+        customer_score = item.get("customer_score", 0)
+
+        # 把所有 assistant 的文本（以及工具结果）拼成一个 output 字符串，
+        # 以便复用 count_valid_tags / remove_result_tags。
+        output_parts: List[str] = []
+        for m in dialogue:
+            if m.get("role") == "assistant":
+                content = (m.get("content") or "").strip()
+                if content:
+                    output_parts.append(content)
+                # 如果希望统计 <result>，可以把 tool_trace 里的结果也包到 <result> 标签中
+                for t in m.get("tool_trace", []) or []:
+                    tool_result = t.get("tool_result")
+                    if tool_result is not None:
+                        try:
+                            result_str = json.dumps(tool_result, ensure_ascii=False)
+                        except Exception:
+                            result_str = str(tool_result)
+                        output_parts.append(f"<result>{result_str}</result>")
+        output = "\n".join(output_parts)
+
+        has_dialogue = bool(dialogue)
+        metrics: Dict[str, Any] = {
+            "is_valid_answer": has_dialogue,              # 对话存在即可视为“有效”
+            "customer_satisfied": int(customer_satisfied),
+            "customer_score": float(customer_score),
+        }
+
+        if not has_dialogue:
+            # 没有对话时，其它指标全部置零/None
+            metrics.update(
+                {
+                    "python_calls": 0,
+                    "search_calls": 0,
+                    "tool_counts": 0,
+                    "tools_used": "none",
+                    "output_length": 0,
+                    "reasoning_answer_consistency": None,
+                    "tool_supported": None,
+                    "token_count": None,
+                    "time_total_sec": None,
+                    # 为了兼容 overall 的 tool_efficiency 计算，给一个占位
+                    "score_for_efficiency": 0.0,
+                }
+            )
+            return metrics
+
+        # ------- 工具调用统计 -------
+        # 仍然保留 python/search 的计数（如果 agent 侧可能用到）
+        python_calls = count_valid_tags(output or "", "python")
+        search_calls = count_valid_tags(output or "", "search")
+
+        # interaction 专用工具：product_search / inventory_check / policy_search / order_lookup / pricing_calc
+        product_search_calls = count_valid_tags(output or "", "product_search")
+        inventory_check_calls = count_valid_tags(output or "", "inventory_check")
+        policy_search_calls = count_valid_tags(output or "", "policy_search")
+        order_lookup_calls = count_valid_tags(output or "", "order_lookup")
+        pricing_calc_calls = count_valid_tags(output or "", "pricing_calc")
+
+        # 所有工具结果都包在 <result>...</result> 中时，可以用 result 次数作为总工具调用次数
+        result_calls = count_valid_tags(output or "", "result")
+        tool_counts = result_calls
+
+        metrics.update(
+            {
+                "python_calls": python_calls,
+                "search_calls": search_calls,
+                "tool_counts": tool_counts,
+                "tools_used": (
+                    "both"
+                    if python_calls and search_calls
+                    else "python"
+                    if python_calls
+                    else "search"
+                    if search_calls
+                    else "none"
+                ),
+                # 细分 interaction 工具的调用次数，便于后续统计
+                "product_search_calls": product_search_calls,
+                "inventory_check_calls": inventory_check_calls,
+                "policy_search_calls": policy_search_calls,
+                "order_lookup_calls": order_lookup_calls,
+                "pricing_calc_calls": pricing_calc_calls,
+                # 输出长度（去掉 <result> 块），可视为“agent 语言长度”
+                "output_length": len(remove_result_tags(output or "")),
+            }
+        )
+
+        # interaction 不适用数学/QA 的 reasoning/tool_supported 指标
+        metrics["reasoning_answer_consistency"] = None
+        metrics["tool_supported"] = None
+
+        # 若你在 interaction 推理中有 timing 记录，可以从 item["timing"]["total_time"] 读；这里先尝试兼容
+        metrics["time_total_sec"] = (item.get("timing", {}) or {}).get("total_time", None)
+        # token_count 暂时留 None，除非你在 interaction 推理时做了重token统计
+        metrics["token_count"] = None
+
+        # 为了后续 calculate_overall_metrics 里的 tool_efficiency 计算，
+        # 可以把 customer_score 作为“score_for_efficiency”的基础分数。
+        metrics["score_for_efficiency"] = float(customer_score)
+
+        return metrics
+    
     async def evaluate_batch(self, data: List[Dict[str, Any]], timeout: Optional[int] = None) -> List[Dict[str, Any]]:
         """Evaluate a list of sample records (concurrently) and attach per-sample metrics."""
         semaphore = asyncio.Semaphore(self.concurrent_limit)
@@ -475,7 +642,10 @@ class Evaluator:
         async def _evaluate_with_semaphore(item: Dict[str, Any]) -> Dict[str, Any]:
             async with semaphore:
                 try:
-                    metrics = await asyncio.wait_for(self.evaluate_sample(item), timeout=timeout)
+                    if self.task_type == "interaction":
+                        metrics = await asyncio.wait_for(self.evaluate_sample_inter(item), timeout=timeout)
+                    else:
+                        metrics = await asyncio.wait_for(self.evaluate_sample(item), timeout=timeout)
                 except asyncio.TimeoutError:
                     print(f"Warning: Evaluation timed out ({timeout} seconds)")
                     metrics = {"status": "timeout"}

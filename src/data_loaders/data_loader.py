@@ -6,7 +6,7 @@ sys.path.append(os.getcwd())
 import json
 from typing import List, Tuple
 
-from .utils import extract_solution, last_boxed_only_string, remove_boxed
+from ..utils import extract_solution, last_boxed_only_string, remove_boxed
 
 
 class DataLoader:

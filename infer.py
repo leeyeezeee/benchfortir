@@ -145,6 +145,15 @@ def _config_to_infer_defaults(c: dict) -> dict:
         "local_search_url": c.get("local_search_url"),
         "max_sequence_length": c.get("max_sequence_length", 20000),
         "compatible_search": c.get("compatible_search", False),
+        # Whether the model is allowed to call tools (tag-based protocols)
+        "use_tool": c.get("use_tool", True),
+        # Interaction (customer side) configuration
+        "customer_api_key": c.get("customer_api_key"),
+        "customer_base_url": c.get("customer_base_url"),
+        "customer_model": c.get("customer_model", "kimi-k2-0905-preview"),
+        "customer_temperature": c.get("customer_temperature", 0.2),
+        "customer_max_tokens": c.get("customer_max_tokens", 2048),
+        "max_turns": c.get("max_turns", 10),
     }
     if isinstance(c.get("summ_model_urls"), list):
         defaults["summ_model_urls"] = c["summ_model_urls"]
@@ -314,6 +323,16 @@ def parse_arguments():
         default=defaults.get("use_sds", False),
         help="Whether to use SDS",
     )
+    inference_group.add_argument(
+        "--use_tool",
+        action="store_true",
+        default=defaults.get("use_tool", True),
+        help=(
+            "Whether the model is allowed to call tools via tag-based protocols "
+            "(e.g., <search>/<python>/<result> or interaction tools). "
+            "When disabled, PromptManager will use no-tool sub-templates."
+        ),
+    )
 
     tools_group = parser.add_argument_group("Tool Configuration")
     tools_group.add_argument(
@@ -432,6 +451,45 @@ def parse_arguments():
         help="Whether to use compatible search",
     )
 
+    # Interaction customer configuration
+    interaction_group = parser.add_argument_group("Interaction Customer Configuration")
+    interaction_group.add_argument(
+        "--customer_api_key",
+        type=str,
+        default=defaults.get("customer_api_key"),
+        help="API key for the customer model (e.g., Kimi)",
+    )
+    interaction_group.add_argument(
+        "--customer_base_url",
+        type=str,
+        default=defaults.get("customer_base_url"),
+        help="Base URL for the customer model API",
+    )
+    interaction_group.add_argument(
+        "--customer_model",
+        type=str,
+        default=defaults.get("customer_model", "kimi-k2-0905-preview"),
+        help="Customer model name (used in interaction task)",
+    )
+    interaction_group.add_argument(
+        "--customer_temperature",
+        type=float,
+        default=defaults.get("customer_temperature", 0.2),
+        help="Temperature for the customer model",
+    )
+    interaction_group.add_argument(
+        "--customer_max_tokens",
+        type=int,
+        default=defaults.get("customer_max_tokens", 2048),
+        help="Maximum tokens for the customer model",
+    )
+    interaction_group.add_argument(
+        "--max_turns",
+        type=int,
+        default=defaults.get("max_turns", 10),
+        help="Maximum dialogue turns per interaction scenario",
+    )
+
     args = parser.parse_args()
 
     # 若未从配置中获得必需字段，则要求命令行提供
@@ -448,6 +506,16 @@ def parse_arguments():
 def get_inference_instance():
     args = parse_arguments()
     print(vars(args))
+
+    # When running interaction task, switch to interaction inference engine
+    if args.prompt_type == "interaction":
+        from src.infer_engines.inference_engine_inter import (
+            AsyncInteractionInference as AsyncInfer,
+        )
+        inference = AsyncInfer(args)
+        return inference
+
+    # Default math/QA inference engines
     if args.use_sds:
         from src.inference_engine import AsyncInferenceCompletionSDS as AsyncInfer
     else:

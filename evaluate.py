@@ -96,7 +96,24 @@ import json
 import time
 from typing import Any, List
 
+try:
+    import yaml  # type: ignore
+except ImportError:
+    yaml = None
+
 from src.evaluator import Evaluator
+
+
+def _load_yaml(path: str) -> dict:
+    """Load a YAML file; return empty dict if file missing or invalid."""
+    if not yaml or not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 def _load_output_file(path: str) -> List[Any]:
@@ -139,43 +156,145 @@ def _load_output_file(path: str) -> List[Any]:
     raise ValueError(f"Unsupported file format: {ext} (supported: .json, .jsonl, .txt)")
 
 
-async def main() -> dict:
-    parser = argparse.ArgumentParser(description="Evaluation Tool (TIR metrics)")
+def _parse_args() -> argparse.Namespace:
+    """
+    Parse CLI args for evaluation.
+
+    Supports optional config files:
+    - --eval_config: path to YAML with eval defaults (task/use_llm/api_base_url/...)
+    - --dataset_config: path to YAML with dataset defaults (dataset_name/output_path)
+    """
+    # First pass: only parse config paths
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument(
+        "--eval_config",
+        type=str,
+        default=None,
+        help="Path to eval config YAML (e.g., src/config/eval/eval.yaml or src/config/eval_config/eval_expo.yaml).",
+    )
+    config_parser.add_argument(
+        "--dataset_config",
+        type=str,
+        default=None,
+        help="Path to dataset config YAML (e.g., src/config/dataset_config/example.yaml).",
+    )
+    config_args, remaining = config_parser.parse_known_args()
+
+    # Load eval defaults
+    eval_defaults: dict = {}
+    if config_args.eval_config and os.path.exists(config_args.eval_config):
+        eval_defaults = _load_yaml(config_args.eval_config)
+
+    # Load dataset defaults
+    dataset_defaults: dict = {}
+    if config_args.dataset_config and os.path.exists(config_args.dataset_config):
+        dataset_defaults = _load_yaml(config_args.dataset_config)
+
+    # Derive default output_path from dataset defaults if possible
+    default_output_path: Any = None
+    ds_name = dataset_defaults.get("dataset_name")
+    ds_out_root = dataset_defaults.get("output_path")
+    if ds_name and ds_out_root:
+        # 默认推理输出命名规则：{output_path}/{dataset_name}_output.json
+        default_output_path = os.path.join(ds_out_root, f"{ds_name}_output.json")
+
+    parser = argparse.ArgumentParser(
+        description="Evaluation Tool (TIR metrics)",
+        parents=[config_parser],
+    )
 
     parser.add_argument(
         "--output_path",
         type=str,
-        required=True,
-        help="Path to the model output file produced by infer.py (.json or .jsonl).",
+        default=default_output_path,
+        help=(
+            "Path to the model output file produced by infer.py (.json or .jsonl). "
+            "If omitted, and --dataset_config is provided with dataset_name/output_path, "
+            "it defaults to {output_path}/{dataset_name}_output.json from that config."
+        ),
     )
     parser.add_argument(
         "--task",
         type=str,
-        required=True,
-        choices=["math", "qa"],
+        default=eval_defaults.get("task"),
+        choices=["math", "qa", "expodesign", "interaction"],
         help="Task type. qa => EM/F1; math => correctness with math equivalence.",
     )
 
     # Optional: LLM-based judging
-    parser.add_argument("--use_llm", action="store_true", help="Use LLM for equivalence evaluation")
-    parser.add_argument("--api_base_url", type=str, default=None, help="Base URL of the LLM API")
-    parser.add_argument("--model_name", type=str, default=None, help="Name of the LLM model used for evaluation")
-    parser.add_argument("--api_key", type=str, default="EMPTY", help="API key for LLM judge (if needed)")
+    parser.add_argument(
+        "--use_llm",
+        action="store_true",
+        default=bool(eval_defaults.get("use_llm", False)),
+        help="Use LLM for equivalence / interaction evaluation",
+    )
+    parser.add_argument(
+        "--api_base_url",
+        type=str,
+        default=eval_defaults.get("api_base_url"),
+        help="Base URL of the LLM API used as judge.",
+    )
+    parser.add_argument(
+        "--model_name",
+        type=str,
+        default=eval_defaults.get("model_name"),
+        help="Name of the LLM model used for evaluation.",
+    )
+    parser.add_argument(
+        "--api_key",
+        type=str,
+        default=eval_defaults.get("api_key", "EMPTY"),
+        help="API key for LLM judge (if needed).",
+    )
 
-    parser.add_argument("--concurrent_limit", type=int, default=50, help="Max concurrent evaluations")
+    parser.add_argument(
+        "--concurrent_limit",
+        type=int,
+        default=int(eval_defaults.get("concurrent_limit", 50)),
+        help="Max concurrent evaluations.",
+    )
 
     # IMPORTANT: this is a per-sample timeout (used inside Evaluator.evaluate_batch)
-    parser.add_argument("--timeout", type=int, default=1800, help="Per-sample evaluation timeout (seconds)")
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=int(eval_defaults.get("timeout", 1800)),
+        help="Per-sample evaluation timeout (seconds).",
+    )
 
     # Optional: tokenizer for token counting
     parser.add_argument(
         "--tokenizer_path",
         type=str,
-        default=None,
+        default=eval_defaults.get("tokenizer_path"),
         help="Tokenizer name/path for estimating token usage. Usually the same as infer.py --model_path.",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(remaining)
+
+    # Required checks
+    if not args.task:
+        parser.error(
+            "--task is required (either via --task or via eval_config with a 'task' field)."
+        )
+    if not args.output_path:
+        parser.error(
+            "--output_path is required when it cannot be derived from --dataset_config. "
+            "Provide it explicitly or supply a dataset_config with 'dataset_name' and 'output_path'."
+        )
+
+    # If use_llm is enabled, ensure basic judge config is present
+    if args.use_llm and (not args.api_base_url or not args.model_name):
+        parser.error(
+            "--use_llm requires both --api_base_url and --model_name "
+            "(or corresponding fields in eval_config)."
+        )
+
+    return args
+
+
+async def main() -> dict:
+    args = _parse_args()
 
     try:
         print(f"Model output file path: {args.output_path}")

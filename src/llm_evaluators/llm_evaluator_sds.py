@@ -11,12 +11,14 @@ from tqdm.asyncio import tqdm as async_tqdm
 from .math_equivalence import is_equiv
 
 
-EVALUATION_PROMPT = """Given a Question and its Golden Answer, verify whether the Predicted Answer is correct. The prediction is correct if it fully aligns with the meaning and key information of the Golden Answer. Respond with "Correct" if the prediction is correct and "Incorrect" otherwise.
+EVALUATION_PROMPT = """Given a Question and its Golden Answer, verify whether the Predicted Answer is correct. The prediction is correct if it fully aligns with the meaning and key information of the Golden Answer.
 Golden Answer may have multiple options, and matching any one of them is considered correct.
 
 Question: {question}
 Golden Answer: {labeled_answer}
 Predicted Answer: {pred_answer}
+
+You must put your final verdict inside the tags <judgment> and </judgment>. Use exactly one of: <judgment>Correct</judgment> or <judgment>Incorrect</judgment>. You may include a brief reason before or after the tags if you wish.
 """
 
 

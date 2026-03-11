@@ -14,6 +14,7 @@ repetition_penalty: 1.1
 include_stop_str_in_output: True
 max_concurrent_requests: 50          # 对应 infer 的 --max_concurrent_requests
 
+use_tool: true
 # ===== vLLM serve configuration =====
 vllm:
   remote: false                      # false 表示本地起 vLLM，true 表示用远程已有服务

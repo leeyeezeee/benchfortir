@@ -1,6 +1,8 @@
+import json
 import time
 import hashlib
-from .utils import *
+from ..utils import *
+
 
 class SampleProcessor:
     def __init__(
@@ -156,9 +158,21 @@ class SampleProcessor:
         self.log_output("user", tool_result)
         self.search_rounds += 1
 
+
     async def run(self):
         """Process one QA pair..."""
         self.sample_start_time = time.time()
+
+        # function calling 模式
+        if getattr(self.args, "function_calling", False):
+            await self.run_with_function_calling()
+            if "output" not in self.sample_stat:
+                self.sample_stat["output"] = ""
+            self.sample_stat["prediction"] = extract_answer(self.sample_stat["output"])
+            self.total_time = time.time() - self.sample_start_time
+            return
+
+        # 兼容原有标签式工具调用流程
         self.process_input()
         while True:
             output = await self.call_llm()

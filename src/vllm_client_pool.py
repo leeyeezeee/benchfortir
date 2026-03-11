@@ -81,6 +81,46 @@ class VLLMClientPool:
                 if attempt == max_attempts - 1: 
                     return await self._retry_with_other_client(prompt, params, session_id)
         return None
+
+    async def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        sampling_params: 'SamplingParams',
+        session_id: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Any:
+        """
+        简单的 Chat Completions 包装。
+
+        - 输入为 messages（role/content 列表），不包含 tools。
+        - 采样参数完全来自 SamplingParams（temperature/top_p/max_tokens 等）。
+        - 一次调用只生成一段 assistant 回复（一次 chat completion）。
+        """
+        params = {
+            "temperature": sampling_params.temperature,
+            "top_p": sampling_params.top_p,
+            "max_tokens": sampling_params.max_tokens,
+        }
+        client = await self.get_client_for_session(session_id)
+        model_name = model or self.default_model
+
+        max_attempts = 4
+        for attempt in range(max_attempts):
+            try:
+                response = await client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=params.get("temperature", 0.7),
+                    top_p=params.get("top_p", 0.7),
+                    max_tokens=params.get("max_tokens", 2048),
+                )
+                return response
+            except Exception as e:
+                print(f"LLM chat request fails: {e}")
+                if attempt == max_attempts - 1:
+                    break
+        return None
+
     
     async def _retry_with_other_client(self, prompt: str, params: Dict[str, Any], session_id: Optional[str] = None) -> Any:
         """Retry using other clients"""

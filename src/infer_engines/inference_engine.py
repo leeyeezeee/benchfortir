@@ -8,12 +8,12 @@ from transformers import AutoTokenizer
 from typing import Dict, Any, Optional
 from tqdm.asyncio import tqdm as async_tqdm
 
-from .prompt_manager import PromptManager
-from .data_loader import DataLoader
-from .tools.tool_executor import ToolExecutor
-from .tools import PythonTool, BingSearchTool, BingSearchToolSDS, SummarizeTool, LocalSearchTool
-from .vllm_client_pool import VLLMClientPool
-from .sample_processor import SampleProcessor, SampleProcessorCompletion
+from ..prompt_manager import PromptManager
+from ..data_loaders.data_loader import DataLoader
+from ..tools.tool_executor import ToolExecutor
+from ..tools import PythonTool, BingSearchTool, BingSearchToolSDS, SummarizeTool, LocalSearchTool
+from ..vllm_client_pool import VLLMClientPool
+from ..processors.sample_processor import SampleProcessor, SampleProcessorCompletion
 
 # 异步推理主类
 class AsyncInference:
@@ -26,8 +26,8 @@ class AsyncInference:
             api_keys=args.api_keys,
             default_model=args.default_model,
         )
-        # 初始化提示词管理器
-        self.prompt_manager = PromptManager(args.prompt_type)
+
+        self.prompt_manager = PromptManager(args.prompt_type, args.use_tool)
         # 加载分词器
         self.tokenizer = AutoTokenizer.from_pretrained(
             args.model_path, trust_remote_code=True
