@@ -16,6 +16,7 @@ from ..vllm_client_pool import VLLMClientPool
 from ..prompt_manager import PromptManager
 from ..tools.tool_executor import ToolExecutor
 from ..tools.python_tool import PythonTool
+from ..tools.read_tool import ReadTool
 from ..tools.interaction_tools import (
     ProductSearchTool,
     InventoryCheckTool,
@@ -65,7 +66,7 @@ class AsyncInteractionInference:
             include_stop_str_in_output=getattr(args, "include_stop_str_in_output", True),
         )
 
-        # Tools: Python + interaction tools
+        # Tools: Python + Read + interaction tools
         self.tool_executor = self._create_tool_executor()
 
         # Scenario-level data loader
@@ -90,8 +91,32 @@ class AsyncInteractionInference:
         self.max_concurrent = getattr(args, "max_concurrent_requests", 10)
         print(f"Initialized {self.__class__.__name__} for interaction task.")
 
+    def _build_read_allowed_roots(self) -> List[str]:
+        configured = list(getattr(self.args, "read_allowed_roots", None) or [])
+        roots: List[str] = []
+
+        def _add(path: Optional[str]) -> None:
+            if not path:
+                return
+            abs_path = os.path.abspath(path)
+            if abs_path not in roots:
+                roots.append(abs_path)
+
+        if configured:
+            for path in configured:
+                _add(path)
+        else:
+            _add(os.getcwd())
+            _add(getattr(self.args, "data_path", None))
+            output_path = getattr(self.args, "output_path", None)
+            if output_path:
+                _add(os.path.dirname(output_path) or ".")
+
+        return roots or [os.getcwd()]
+
     def _create_tool_executor(self) -> ToolExecutor:
         executor = ToolExecutor()
+
         # Python tool (optional, for agent-side computations)
         python_tool = PythonTool(
             conda_path=self.args.conda_path,
@@ -99,6 +124,17 @@ class AsyncInteractionInference:
             max_concurrent=self.args.python_max_concurrent,
         )
         executor.register_tool(python_tool)
+
+        # Generic file/document reader for interaction scenarios
+        executor.register_tool(
+            ReadTool(
+                allowed_roots=self._build_read_allowed_roots(),
+                timeout=int(getattr(self.args, "read_timeout", 30)),
+                max_chars=int(getattr(self.args, "read_max_chars", 8000)),
+                enable_image_ocr=bool(getattr(self.args, "read_enable_ocr", False)),
+            )
+        )
+
         # Interaction-specific tools
         executor.register_tool(ProductSearchTool())
         executor.register_tool(InventoryCheckTool())
@@ -167,4 +203,3 @@ class AsyncInteractionInference:
 
 
 __all__ = ["AsyncInteractionInference"]
-

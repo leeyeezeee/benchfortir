@@ -12,6 +12,7 @@ EXPO_DESIGN_TOOL_PROTOCOL = """
 You should reason step by step and you MAY call tools during your reasoning:
 - To run code, wrap Python code inside <python> and </python>. The system will execute it and return the output inside <result> and </result>.
 - To look up information, wrap a search query inside <search> and </search>. The system will return search results inside <result> and </result>.
+- To read a file, wrap a file path or a JSON request inside <read> and </read>. The system will return extracted file content inside <result> and </result>.
 
 You may interleave multiple rounds of thinking and tool calls. After using tools as needed, you MUST output a final experiment card as JSON inside <answer> and </answer>.
 
@@ -22,6 +23,26 @@ Hard constraints:
 - Include at least 2 metrics: one primary, one secondary.
 - Code used for checking or prototyping should appear in <python> blocks; do NOT embed runnable code fields in the final JSON.
 
+""".strip()
+
+READ_TOOL_PROTOCOL_EN = """
+You also have access to a file reading tool.
+- To read a local file or a downloadable URL, wrap the request inside <read> and </read>.
+- The system will return the extracted content inside <result> and </result>.
+- The read tool supports common file types such as txt, md, json, csv, html, pdf, docx, xlsx, and image metadata/OCR when available.
+Examples:
+<read>/absolute/path/to/report.pdf</read>
+<read>{"path": "/absolute/path/to/report.pdf", "page": 2, "max_chars": 4000}</read>
+""".strip()
+
+READ_TOOL_PROTOCOL_ZH = """
+你还可以使用文件读取工具。
+- 需要读取本地文件或可下载 URL 时，请使用 <read> 和 </read>。
+- 系统会把提取出的内容放在 <result> 和 </result> 中返回。
+- 读取工具支持常见文件类型，如 txt、md、json、csv、html、pdf、docx、xlsx，以及在可用时返回图片 OCR/元数据。
+示例：
+<read>/absolute/path/to/report.pdf</read>
+<read>{"path": "/absolute/path/to/report.pdf", "page": 2, "max_chars": 4000}</read>
 """.strip()
 
 # Expodesign：最终 JSON schema（不包含工具调用说明）
@@ -77,7 +98,17 @@ class PromptManager:
         """
         self.prompt_type = prompt_type
         self.use_tool = use_tool
-        self.prompt_template = self._get_template()
+        self.prompt_template = self._append_read_tool_notice(self._get_template())
+
+    def _append_read_tool_notice(self, prompt: str) -> str:
+        if not self.use_tool:
+            return prompt
+        if self.prompt_type == "interaction":
+            return prompt
+        if "<read>" in prompt or "read tool" in prompt.lower() or "文件读取工具" in prompt:
+            return prompt
+        notice = READ_TOOL_PROTOCOL_ZH if self.prompt_type == "code_search_cn" else READ_TOOL_PROTOCOL_EN
+        return prompt.rstrip() + "\n\n" + notice
 
     def _get_template(self) -> str:
         """Get the prompt template based on prompt type."""
@@ -350,54 +381,75 @@ class PromptManager:
 
     def get_csbench_prompt(self, format: str = None) -> str:
         """
-        CSBench 专用系统提示词（仅标签式工具调用协议：<search>/<python>/<result>/<answer>）。
+        CSBench 专用系统提示词（标签式工具调用协议：<search>/<python>/<read>/<result>/<answer>）。
         """
+        tool_line = (
+            "When needed, call tools with <search>...</search>, <python>...</python>, or <read>...</read>. "
+            "The system will return tool outputs inside <result>...</result>. "
+        )
+        final_line = (
+            "Put your reasoning in <think>...</think> and your final answer in <answer>...</answer>. "
+            "When the answer is exact, enclose it in LaTeX \\[ \\boxed{...} \\]."
+        )
+
         if format == "Multiple-choice":
+            if self.use_tool:
+                return (
+                    "You are a helpful assistant that answers multiple-choice questions step by step. "
+                    "Analyze the question and the options carefully, then decide whether you need factual lookup, computation, or file reading. "
+                    + tool_line
+                    + final_line
+                    + "The final boxed answer should be the option label or the exact option content."
+                )
             return (
-                "You are a helpful assistant that answers multiple-choice questions step by step, "
-                "with access to two tools: a wikipedia search tool and a python interpreter tool. "
-                "Given a question and its options, first reason about the problem, then decide when to call web search "
-                "for factual information and when to call Python for calculations or code execution. "
-                "Describe clearly what you want each tool to do; the system will invoke the tools for you. "
-                "Do not emit any custom markup tags such as <search>, <python>, or <result>. "
-                "After using tools as needed, select the correct option and present the final answer, with the exact choice "
-                "enclosed in LaTeX \\[ \\boxed{...} \\ ]."
+                "You are a helpful assistant that answers multiple-choice questions step by step. "
+                + final_line
+                + "The final boxed answer should be the option label or the exact option content."
             )
-        elif format == "Assertion":
+
+        if format == "Assertion":
+            if self.use_tool:
+                return (
+                    "You are a helpful assistant that determines whether a statement is true or false. "
+                    "First identify what facts, calculations, or file evidence are needed. "
+                    + tool_line
+                    + final_line
+                    + "Output the final verdict as \\[ \\boxed{true} \\] or \\[ \\boxed{false} \\]."
+                )
             return (
-                "You are a helpful assistant that determines whether a given statement is true or false, "
-                "with access to a wikipedia search tool and a python interpreter tool. "
-                "First analyze the statement and identify what evidence or calculations are needed. "
-                "Use web search to retrieve relevant facts and Python to perform any necessary computations. "
-                "Clearly state what you want the tools to do; the system will call them for you. "
-                "Do not emit any custom markup tags such as <search>, <python>, or <result>. "
-                "Finally, output whether the statement is true or false, with the final verdict enclosed in "
-                "LaTeX \\[ \\boxed{true} \\] or \\[ \\boxed{false} \\ ]."
+                "You are a helpful assistant that determines whether a statement is true or false. "
+                + final_line
+                + "Output the final verdict as \\[ \\boxed{true} \\] or \\[ \\boxed{false} \\]."
             )
-        elif format == "Fill-in-the-blank":
+
+        if format == "Fill-in-the-blank":
+            if self.use_tool:
+                return (
+                    "You are a helpful assistant that solves fill-in-the-blank questions step by step. "
+                    "Reason about what information is missing and whether it should come from search, computation, or file reading. "
+                    + tool_line
+                    + final_line
+                )
             return (
-                "You are a helpful assistant that solves fill-in-the-blank questions step by step, "
-                "with access to a wikipedia search tool and a python interpreter tool. "
-                "Given a question with a blank, reason about what information is missing and how to obtain it. "
-                "Use web search to look up facts and Python to perform calculations or structured checks if needed. "
-                "Clearly explain what you want each tool to do; the system will invoke them on your behalf. "
-                "Do not emit any custom markup tags such as <search>, <python>, or <result>. "
-                "After using tools, provide the value that should fill the blank, with the exact answer enclosed in "
-                "LaTeX \\[ \\boxed{...} \\ ]."
+                "You are a helpful assistant that solves fill-in-the-blank questions step by step. "
+                + final_line
             )
-        elif format == "Open-ended":
+
+        if format == "Open-ended":
+            if self.use_tool:
+                return (
+                    "You are a helpful assistant that answers open-ended questions step by step. "
+                    "Analyze the question, decide what outside information is needed, and use search, Python, or file reading when appropriate. "
+                    + tool_line
+                    + final_line
+                )
             return (
-                "You are a helpful assistant that answers open-ended questions step by step, "
-                "with access to a wikipedia search tool and a python interpreter tool. "
-                "Analyze the question, decide what factual information or calculations are needed, and call web search or Python accordingly. "
-                "Clearly describe what you want the tools to do; the system will perform the actual calls. "
-                "Do not emit any custom markup tags such as <search>, <python>, or <result>. "
-                "After using tools as needed, provide a brief, well-reasoned answer, with any exact numerical result enclosed in "
-                "LaTeX \\[ \\boxed{...} \\ ] when appropriate."
+                "You are a helpful assistant that answers open-ended questions step by step. "
+                + final_line
             )
-        else:
-            raise ValueError(f"Unknown format: {format}")
-    
+
+        raise ValueError(f"Unknown format: {format}")
+
     def get_system_prompt(self, format: str=None) -> str:
         """Get the system prompt."""
         if format is not None and format == "Multiple-choice":

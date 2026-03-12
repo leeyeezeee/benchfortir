@@ -124,11 +124,16 @@ def _config_to_infer_defaults(c: dict) -> dict:
         "data_path": c.get("data_path"),
         "max_python_times": c.get("max_python_times", 5),
         "max_search_times": c.get("max_search_times", 3),
+        "max_read_times": c.get("max_read_times", 3),
         "sample_timeout": c.get("sample_timeout", 120),
         "use_sds": c.get("use_sds", False),
         "conda_path": c.get("conda_path"),
         "conda_env": c.get("conda_env"),
         "python_max_concurrent": c.get("python_max_concurrent", 32),
+        "read_allowed_roots": c.get("read_allowed_roots"),
+        "read_max_chars": c.get("read_max_chars", 8000),
+        "read_timeout": c.get("read_timeout", 30),
+        "read_enable_ocr": c.get("read_enable_ocr", False),
         "bing_api_key": c.get("bing_api_key", ""),
         "bing_zone": c.get("bing_zone", "serp_api1"),
         "search_max_results": c.get("search_max_results", 10),
@@ -312,6 +317,12 @@ def parse_arguments():
         help="Maximum number of search tool invocations",
     )
     inference_group.add_argument(
+        "--max_read_times",
+        type=int,
+        default=defaults.get("max_read_times", 3),
+        help="Maximum number of read tool invocations",
+    )
+    inference_group.add_argument(
         "--sample_timeout",
         type=int,
         default=defaults.get("sample_timeout", 120),
@@ -352,6 +363,31 @@ def parse_arguments():
         type=int,
         default=defaults.get("python_max_concurrent", 32),
         help="Maximum concurrency for Python executor",
+    )
+    tools_group.add_argument(
+        "--read_allowed_roots",
+        type=str,
+        nargs="+",
+        default=defaults.get("read_allowed_roots"),
+        help="Allowed roots for the read tool. Defaults to cwd plus data/output roots when omitted.",
+    )
+    tools_group.add_argument(
+        "--read_max_chars",
+        type=int,
+        default=defaults.get("read_max_chars", 8000),
+        help="Maximum characters returned by one read call",
+    )
+    tools_group.add_argument(
+        "--read_timeout",
+        type=int,
+        default=defaults.get("read_timeout", 30),
+        help="Timeout in seconds for remote read requests",
+    )
+    tools_group.add_argument(
+        "--read_enable_ocr",
+        action="store_true",
+        default=defaults.get("read_enable_ocr", False),
+        help="Enable optional OCR for image reads when pytesseract is installed",
     )
     tools_group.add_argument(
         "--bing_api_key",
@@ -509,17 +545,26 @@ def get_inference_instance():
 
     # When running interaction task, switch to interaction inference engine
     if args.prompt_type == "interaction":
-        from src.infer_engines.inference_engine_inter import (
-            AsyncInteractionInference as AsyncInfer,
-        )
+        try:
+            from src.infer_engines.inference_engine_inter import (
+                AsyncInteractionInference as AsyncInfer,
+            )
+        except ImportError:
+            from src.inference_engine_inter import AsyncInteractionInference as AsyncInfer
         inference = AsyncInfer(args)
         return inference
 
     # Default math/QA inference engines
-    if args.use_sds:
-        from src.inference_engine import AsyncInferenceCompletionSDS as AsyncInfer
-    else:
-        from src.inference_engine import AsyncInference as AsyncInfer
+    try:
+        if args.use_sds:
+            from src.infer_engines.inference_engine import AsyncInferenceCompletionSDS as AsyncInfer
+        else:
+            from src.infer_engines.inference_engine import AsyncInference as AsyncInfer
+    except ImportError:
+        if args.use_sds:
+            from src.inference_engine import AsyncInferenceCompletionSDS as AsyncInfer
+        else:
+            from src.inference_engine import AsyncInference as AsyncInfer
 
     inference = AsyncInfer(args)
     return inference

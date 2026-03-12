@@ -11,7 +11,7 @@ from tqdm.asyncio import tqdm as async_tqdm
 from ..prompt_manager import PromptManager
 from ..data_loaders.data_loader import DataLoader
 from ..tools.tool_executor import ToolExecutor
-from ..tools import PythonTool, BingSearchTool, BingSearchToolSDS, SummarizeTool, LocalSearchTool
+from ..tools import PythonTool, BingSearchTool, BingSearchToolSDS, SummarizeTool, LocalSearchTool, ReadTool
 from ..vllm_client_pool import VLLMClientPool
 from ..processors.sample_processor import SampleProcessor, SampleProcessorCompletion
 
@@ -70,6 +70,32 @@ class AsyncInference:
         self.sample_timeout = getattr(args, "sample_timeout", 240)
         print(f"Initialized {self.__class__.__name__}...")
 
+    def _build_read_allowed_roots(self):
+        roots = []
+        explicit_roots = getattr(self.args, "read_allowed_roots", None) or []
+        roots.extend(explicit_roots)
+        roots.append(os.getcwd())
+
+        for maybe_path in [getattr(self.args, "data_path", None), getattr(self.args, "output_path", None)]:
+            if not maybe_path:
+                continue
+            abs_path = os.path.abspath(os.path.expanduser(maybe_path))
+            if os.path.splitext(abs_path)[1]:
+                roots.append(os.path.dirname(abs_path))
+            else:
+                roots.append(abs_path)
+
+        deduped = []
+        seen = set()
+        for root in roots:
+            if not root:
+                continue
+            norm = os.path.realpath(os.path.abspath(os.path.expanduser(root)))
+            if norm not in seen:
+                seen.add(norm)
+                deduped.append(norm)
+        return deduped
+
     # 创建工具执行器，注册Python工具和Bing搜索工具
     def _create_tool_executor(self):
         tool_executor = ToolExecutor()
@@ -80,6 +106,15 @@ class AsyncInference:
             max_concurrent=self.args.python_max_concurrent,
         )
         tool_executor.register_tool(python_tool)
+
+        read_tool = ReadTool(
+            allowed_roots=self._build_read_allowed_roots(),
+            timeout=getattr(self.args, "read_timeout", 30),
+            max_chars=getattr(self.args, "read_max_chars", 8000),
+            enable_image_ocr=getattr(self.args, "read_enable_ocr", False),
+        )
+        tool_executor.register_tool(read_tool)
+
         # 注册Bing搜索工具
         if not self.args.compatible_search:
 

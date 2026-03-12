@@ -6,6 +6,13 @@ conda_env: null               # Conda 环境名
 python_max_concurrent: 32      # Python 执行器最大并发数
 max_python_times: 5           # 单样本最多调用 Python 工具次数
 
+# ----- 文件读取工具 -----
+max_read_times: 3             # 单样本最多调用 read 次数
+read_allowed_roots: null      # 允许读取的根目录；为空时自动放行 cwd/data_path/output_path 的目录
+read_max_chars: 8000          # 单次 read 返回的最大字符数
+read_timeout: 30              # 读取远端 URL 时的超时时间（秒）
+read_enable_ocr: false        # 图片 OCR（需要额外安装 pytesseract + 系统 tesseract）
+
 # ----- 搜索工具（二选一或 compatible_search 下按 dataset 选） -----
 use_local_search: false       # true 时使用本地检索服务，否则使用 Bing 网页搜索
 local_search_url: null       # 本地检索服务地址，如 host:port

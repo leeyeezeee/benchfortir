@@ -1,10 +1,13 @@
+import hashlib
 import json
 import time
-import hashlib
+
 from ..utils import *
 
 
 class SampleProcessor:
+    TERMINAL_TAGS = ("search", "python", "read", "answer")
+
     def __init__(
         self,
         prompt_manager,
@@ -35,20 +38,42 @@ class SampleProcessor:
         self.llm_time = 0
         self.python_time = 0
         self.search_time = 0
+        self.read_time = 0
         self.total_time = None
         self.python_rounds = 0
         self.search_rounds = 0
+        self.read_rounds = 0
         self.in_context = ""
-        if self.format == 'Multiple-choice':
+        if self.format == "Multiple-choice":
             self.messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"{self.sample_stat['input']}\n\n{make_choices_format(self.choice)}"},
+                {
+                    "role": "user",
+                    "content": f"{self.sample_stat['input']}\n\n{make_choices_format(self.choice)}",
+                },
             ]
         else:
             self.messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": self.sample_stat['input']},
+                {"role": "user", "content": self.sample_stat["input"]},
             ]
+
+    def _terminal_closing_tags(self):
+        return tuple(f"</{tag}>" for tag in self.TERMINAL_TAGS)
+
+    def _contains_terminal_tag(self, text: str) -> bool:
+        return any(close_tag in text for close_tag in self._terminal_closing_tags())
+
+    def _truncate_to_first_terminal_tag(self, text: str) -> str:
+        positions = []
+        for close_tag in self._terminal_closing_tags():
+            pos = text.find(close_tag)
+            if pos != -1:
+                positions.append((pos, close_tag))
+        if not positions:
+            return text
+        pos, close_tag = min(positions, key=lambda x: x[0])
+        return text[: pos + len(close_tag)]
 
     def log_output(self, role: str, content: str):
         self.sample_stat["choice"] = self.choice
@@ -66,7 +91,6 @@ class SampleProcessor:
 
     async def call_local_llm(self, stop) -> str:
         in_context = self.in_context
-
         all_output = ""
         try_time = 0
         while try_time < 4:
@@ -74,30 +98,19 @@ class SampleProcessor:
             llm_start = time.time()
             result = await self.vllm_pool.generate(
                 in_context,
-                (
-                    self.args.sampling_params
-                    if stop is True
-                    else self.args.sampling_params_nostop
-                ),
+                self.args.sampling_params if stop is True else self.args.sampling_params_nostop,
                 session_id=self.session_id,
             )
             self.llm_time += time.time() - llm_start
             if not result:
-                return 'None' if not all_output else all_output
+                return "None" if not all_output else all_output
+
             output = result.choices[0].text
             output = output.split("<result>")[0]
-            if "</search>" in output:
-                output = output.split("</search>")[0] + "</search>"
-            if "</python>" in output:
-                output = output.split("</python>")[0] + "</python>"
-            if "</answer>" in output:
-                output = output.split("</answer>")[0] + "</answer>"
+            output = self._truncate_to_first_terminal_tag(output)
             all_output += output
-            if (
-                "</search>" not in all_output
-                and "</python>" not in all_output
-                and "</answer>" not in all_output
-            ):
+
+            if not self._contains_terminal_tag(all_output):
                 in_context += output
             else:
                 break
@@ -110,9 +123,7 @@ class SampleProcessor:
 
     async def call_python(self, python_code: str):
         python_start = time.time()
-        python_result = await self.tool_executor.execute(
-            "python", python_code, timeout=120
-        )
+        python_result = await self.tool_executor.execute("python", python_code, timeout=120)
         self.python_time += time.time() - python_start
         tool_result = f"<result>{python_result}</result>"
         self.log_output("user", tool_result)
@@ -136,7 +147,7 @@ class SampleProcessor:
                     sample_stat=self.sample_stat,
                 )
         else:
-            if self.args.dataset_name in ['2wiki', 'bamboogle', 'musique', 'hotpotqa']:
+            if self.args.dataset_name in ["2wiki", "bamboogle", "musique", "hotpotqa"]:
                 search_result = await self.tool_executor.execute(
                     "localsearch",
                     search_query,
@@ -152,18 +163,28 @@ class SampleProcessor:
                 )
         self.search_time += time.time() - search_start
         if search_query is None or search_result is None:
-            tool_result = f"<result></result>"
+            tool_result = "<result></result>"
         else:
             tool_result = f"<result>{search_result}</result>"
         self.log_output("user", tool_result)
         self.search_rounds += 1
 
+    async def call_read(self, read_request: str):
+        read_start = time.time()
+        read_result = await self.tool_executor.execute(
+            "read",
+            read_request,
+            timeout=getattr(self.args, "read_timeout", 120),
+        )
+        self.read_time += time.time() - read_start
+        tool_result = f"<result>{read_result}</result>" if read_result is not None else "<result></result>"
+        self.log_output("user", tool_result)
+        self.read_rounds += 1
 
     async def run(self):
-        """Process one QA pair..."""
+        """Process one QA pair."""
         self.sample_start_time = time.time()
 
-        # function calling 模式
         if getattr(self.args, "function_calling", False):
             await self.run_with_function_calling()
             if "output" not in self.sample_stat:
@@ -172,7 +193,6 @@ class SampleProcessor:
             self.total_time = time.time() - self.sample_start_time
             return
 
-        # 兼容原有标签式工具调用流程
         self.process_input()
         while True:
             output = await self.call_llm()
@@ -182,14 +202,15 @@ class SampleProcessor:
             if tool_tag == "python" and self.python_rounds < self.args.max_python_times:
                 python_code = self.tool_executor.extract_content(output, "python")
                 await self.call_python(python_code)
-            elif (
-                tool_tag == "search" and self.search_rounds < self.args.max_search_times
-            ):
+            elif tool_tag == "search" and self.search_rounds < self.args.max_search_times:
                 search_query = self.tool_executor.extract_content(output, "search")
                 await self.call_search(search_query)
+            elif tool_tag == "read" and self.read_rounds < getattr(self.args, "max_read_times", 3):
+                read_request = self.tool_executor.extract_content(output, "read")
+                await self.call_read(read_request)
             else:
                 if not output.strip().endswith("</answer>"):
-                    output = await self.call_llm(stop=False)
+                    await self.call_llm(stop=False)
                 break
 
         if "output" not in self.sample_stat:
@@ -202,22 +223,26 @@ class SampleProcessor:
             "llm_time": self.llm_time,
             "python_time": self.python_time,
             "search_time": self.search_time,
+            "read_time": self.read_time,
             "total_time": self.total_time,
         }
 
 
 class SampleProcessorCompletion(SampleProcessor):
-
     def call_python_max_limit(self):
-        limit_message = f"<result>The maximum python call limit is exceeded. You are not allowed to use python.</result>"
+        limit_message = "<result>The maximum python call limit is exceeded. You are not allowed to use python.</result>"
         self.log_output("user", limit_message)
 
     def call_search_max_limit(self):
-        limit_message = f"<result>The maximum search limit is exceeded. You are not allowed to search.</result>"
+        limit_message = "<result>The maximum search limit is exceeded. You are not allowed to search.</result>"
+        self.log_output("user", limit_message)
+
+    def call_read_max_limit(self):
+        limit_message = "<result>The maximum read limit is exceeded. You are not allowed to read more files.</result>"
         self.log_output("user", limit_message)
 
     def call_search_same_query(self):
-        limit_message = f"<result>You have searched this query. Please refer to previous results.</result>"
+        limit_message = "<result>You have searched this query. Please refer to previous results.</result>"
         self.log_output("user", limit_message)
 
     async def run(self):
@@ -240,6 +265,12 @@ class SampleProcessorCompletion(SampleProcessor):
                     await self.call_search(search_query)
                 else:
                     self.call_search_max_limit()
+            elif tool_tag == "read":
+                if self.read_rounds < getattr(self.args, "max_read_times", 3):
+                    read_request = self.tool_executor.extract_content(output, "read")
+                    await self.call_read(read_request)
+                else:
+                    self.call_read_max_limit()
             else:
                 break
         self.sample_stat["prediction"] = extract_answer(self.sample_stat["output"])

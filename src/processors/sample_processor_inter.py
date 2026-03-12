@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI  # type: ignore
 
+
 class SampleProcessorInter:
     """
     Orchestrate one full interaction scenario (agent ↔ customer) for the interaction task.
@@ -58,6 +59,11 @@ class SampleProcessorInter:
         self.customer_score: int = 0
         self.customer_reason: str = ""
 
+        # Read tool stats / limits (other interaction tools still use max_tool_iters)
+        self.read_rounds: int = 0
+        self.read_time: float = 0.0
+        self.max_read_times: int = int(getattr(self.args, "max_read_times", 3))
+
         self._init_conversation()
 
     def _init_conversation(self) -> None:
@@ -72,14 +78,34 @@ class SampleProcessorInter:
             {"role": "user", "content": first_user, "source": "scenario_first_turn"}
         ]
 
+    def _tool_timeout(self, tag: str) -> int:
+        if tag == "read":
+            return int(getattr(self.args, "read_timeout", 30))
+        return 120
+
+    def _build_tool_limit_result(self, tag: str) -> str:
+        if tag == "read":
+            return json.dumps(
+                {
+                    "error": "The maximum read tool call limit is exceeded. You are not allowed to use read anymore in this turn."
+                },
+                ensure_ascii=False,
+            )
+        return json.dumps(
+            {
+                "error": f"The maximum tool call limit is exceeded for tool: {tag}."
+            },
+            ensure_ascii=False,
+        )
+
     async def _run_agent_turn(self, turn_idx: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """
         Run one agent turn, possibly with multiple tag-based tool calls.
 
         The flow is:
         - Call chat.completions once to get assistant text.
-        - If the text contains a tool tag (product_search / inventory_check / policy_search / order_lookup / pricing_calc),
-          extract the tag content and execute the corresponding tool via ToolExecutor.
+        - If the text contains a tool tag (product_search / inventory_check / policy_search /
+          order_lookup / pricing_calc / read), extract the tag content and execute the tool.
         - Append <result>...</result> as a new message, then call chat again.
         - Repeat until no new tool tag appears in the assistant message.
         """
@@ -130,12 +156,26 @@ class SampleProcessorInter:
                 # No further tools; this is the final reply for this turn
                 return assistant_entry, tool_trace
 
+            # Mark this assistant message as a tool-call turn so we can hide it from the simulated customer.
+            assistant_entry["source"] = "tool_call"
+
             # Extract tag content and execute the corresponding tool
             tool_content = self.tool_executor.extract_content(content, tag)
-            try:
-                raw_result = await self.tool_executor.execute(tag, tool_content, timeout=120)
-            except Exception as e:
-                raw_result = json.dumps({"error": str(e)}, ensure_ascii=False)
+            if tag == "read" and self.read_rounds >= self.max_read_times:
+                raw_result = self._build_tool_limit_result(tag)
+            else:
+                tool_start = time.time()
+                try:
+                    raw_result = await self.tool_executor.execute(
+                        tag,
+                        tool_content,
+                        timeout=self._tool_timeout(tag),
+                    )
+                except Exception as e:
+                    raw_result = json.dumps({"error": str(e)}, ensure_ascii=False)
+                if tag == "read":
+                    self.read_rounds += 1
+                    self.read_time += time.time() - tool_start
 
             try:
                 parsed_result = json.loads(raw_result)
@@ -150,11 +190,14 @@ class SampleProcessorInter:
                 }
             )
 
-            # Feed tool result back to the agent using <result> tag
+            # Feed tool result back to the agent using <result> tag.
+            # Mark it so the simulated customer does not see tool internals.
             self.messages.append(
                 {
                     "role": "user",
                     "content": f"<result>{raw_result}</result>",
+                    "source": "tool_result",
+                    "tool_name": tag,
                 }
             )
 
@@ -232,11 +275,13 @@ class SampleProcessorInter:
           {message, satisfied, score, reason}
         We feed scenario context + the chat transcript (agent/customer text only).
         """
-        # Build transcript for customer model (avoid leaking tool internals)
+        # Build transcript for customer model and avoid leaking tool internals.
         transcript_lines: List[str] = []
         for m in self.messages:
             role = m.get("role")
             if role == "system" or role == "tool":
+                continue
+            if m.get("source") in {"tool_call", "tool_result"}:
                 continue
             content = (m.get("content") or "").strip()
             if not content:
@@ -343,4 +388,3 @@ class SampleProcessorInter:
 
 
 __all__ = ["SampleProcessorInter"]
-

@@ -46,6 +46,7 @@ Optional fields (for process/tool/cost metrics)
       "llm_time": float,
       "python_time": float,
       "search_time": float,
+      "read_time": float,
       "total_time": float
     }
 

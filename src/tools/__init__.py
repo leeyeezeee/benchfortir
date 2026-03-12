@@ -8,6 +8,7 @@ from .search_tool import BingSearchTool
 from .tool_executor import ToolExecutor, FunctionCallingParser, FUNCTION_CALLING_TOOLS_SPEC
 from .search_tool_sds import BingSearchToolSDS
 from .local_search_tool import LocalSearchTool
+from .read_tool import ReadTool
 from .summarize_tool import SummarizeTool
 
 __all__ = [
