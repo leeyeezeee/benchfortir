@@ -10,9 +10,6 @@ DATASET_CONFIG_DIR="src/config/dataset_config"
 OUTPUT_DIR_TOOL="results_tool"
 OUTPUT_DIR_NOTOOL="results_notool"
 
-LOG_DIR="logs"
-mkdir -p "$LOG_DIR"
-
 # 1. 启动 4 个 vLLM 实例（4*4090 数据并行）
 GPUS="${GPUS:-0,1,2,3}"
 BASE_PORT="${BASE_PORT:-8001}"
@@ -37,9 +34,8 @@ python deploy.py \
   --base_port "$BASE_PORT" \
   --host "$HOST" \
   --error_only \
-  --log_dir "$LOG_DIR" \
   --startup_sleep "$STARTUP_SLEEP" \
-  1>/dev/null 2>>"$LOG_DIR/deploy.err.log" &
+  1>/dev/null &
 DEPLOY_PID=$!
 
 echo "[run] Started vLLM deployer (PID=$DEPLOY_PID), waiting 20s..."
@@ -66,7 +62,7 @@ for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
     --use_tool true \
     --output_path "$OUTPUT_DIR_TOOL" \
     --endpoints "${ENDPOINTS[@]}" \
-    1>/dev/null 2>>"$LOG_DIR/infer.err.log"
+    1>/dev/null
 
   echo "========== Infer (use_tool=false): $name =========="
   python infer.py \
@@ -76,7 +72,7 @@ for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
     --use_tool false \
     --output_path "$OUTPUT_DIR_NOTOOL" \
     --endpoints "${ENDPOINTS[@]}" \
-    1>/dev/null 2>>"$LOG_DIR/infer.err.log"
+    1>/dev/null
 done
 
 # 3. 结束 vLLM 进程（通过 deployer 清理所有实例）

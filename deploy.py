@@ -188,7 +188,8 @@ def deploy_multi_vllm(
         if stderr_f is not None:
             opened_logs.append(stderr_f)
 
-        print(f"[deploy] started vLLM pid={proc.pid} gpu={gpu} port={port}", file=sys.stderr if error_only else sys.stdout)
+        if not error_only:
+            print(f"[deploy] started vLLM pid={proc.pid} gpu={gpu} port={port}")
         if startup_sleep and startup_sleep > 0:
             time.sleep(float(startup_sleep))
 
