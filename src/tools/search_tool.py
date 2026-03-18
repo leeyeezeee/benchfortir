@@ -23,7 +23,7 @@ class BingSearchTool(BaseTool):
     def __init__(
         self,
         api_key: str,
-        zone: str = "your_zone",
+        zone: str = "serp_api1",
         max_results: int = 10,
         result_length: int = 1000,
         location: str = "cn",
