@@ -23,7 +23,7 @@ bing_api_key: "1fe0c252-f2e3-40b2-8e9b-096e74e60465"
 bing_zone: serp_api1
 search_max_results: 10
 search_result_length: 1000
-bing_requests_per_second: 0.5
+bing_requests_per_second: 1.0
 bing_max_retries: 3
 bing_retry_delay: 1.0
 search_cache_file: search_cache.db
