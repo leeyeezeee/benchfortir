@@ -6,6 +6,5 @@
 dataset_name: expodesign
 data_path: data
 output_path: results
-counts: 0
 prompt_type: expodesign
 sample_timeout: 300

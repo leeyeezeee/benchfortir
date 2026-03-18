@@ -6,7 +6,6 @@
 dataset_name: interaction
 data_path: data
 output_path: results
-counts: 0
 prompt_type: interaction
 sample_timeout: 600
 max_turns: 10

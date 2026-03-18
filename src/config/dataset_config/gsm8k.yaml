@@ -5,6 +5,5 @@
 dataset_name: gsm8k
 data_path: data
 output_path: results
-counts: 0
 prompt_type: math
 sample_timeout: 120

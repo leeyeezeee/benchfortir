@@ -34,6 +34,7 @@ python deploy.py \
   --base_port "$BASE_PORT" \
   --host "$HOST" \
   --error_only \
+  --log_dir "" \
   --startup_sleep "$STARTUP_SLEEP" \
   1>/dev/null &
 DEPLOY_PID=$!
