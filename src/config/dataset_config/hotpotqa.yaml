@@ -1,0 +1,11 @@
+# ========== 数据集配置：HotpotQA ==========
+# DataLoader: else branch → question, answer
+# 多跳 QA；infer 中 compatible_search 会对此数据集使用 localsearch
+# 数据文件：{data_path}/{dataset_name}/test.jsonl
+
+dataset_name: hotpotqa
+data_path: data
+output_path: results
+counts: 0
+prompt_type: code_search
+sample_timeout: 180

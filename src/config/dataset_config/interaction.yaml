@@ -1,0 +1,12 @@
+# ========== 数据集配置：Interaction（电商客服多轮对话） ==========
+# InteractionDataLoader 要求 data_path 为场景 JSONL 文件的完整路径（非目录）。
+# 从 evaluation/ 运行时使用：data/interaction/task1_templates.jsonl
+# 从项目根运行时请改为：evaluation/data/interaction/task1_templates.jsonl
+
+dataset_name: interaction
+data_path: data
+output_path: results
+counts: 0
+prompt_type: interaction
+sample_timeout: 600
+max_turns: 10

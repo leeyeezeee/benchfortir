@@ -1,0 +1,10 @@
+# ========== 数据集配置：Math500 ==========
+# DataLoader: else branch → question, answer
+# 数据文件：{data_path}/{dataset_name}/test.jsonl
+
+dataset_name: math500
+data_path: data
+output_path: results
+counts: 0
+prompt_type: math
+sample_timeout: 120

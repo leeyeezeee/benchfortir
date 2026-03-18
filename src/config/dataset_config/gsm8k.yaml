@@ -1,0 +1,10 @@
+# ========== 数据集配置：GSM8K ==========
+# DataLoader: "gsm8k" in path → question/problem, answer (extract_solution for ####)
+# 数据文件：{data_path}/{dataset_name}/test.jsonl
+
+dataset_name: gsm8k
+data_path: data
+output_path: results
+counts: 0
+prompt_type: math
+sample_timeout: 120

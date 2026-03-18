@@ -19,8 +19,6 @@ infer_mode_help = """Inference mode selection
 [completion_sds]:    Builds on [completion] by using a simple deep search engine.
 """
 
-DEFAULT_CONFIG_DIR = "src/config"
-
 
 def _load_yaml(path: str) -> dict:
     """Load a YAML file; return empty dict if file missing or invalid."""
@@ -34,55 +32,37 @@ def _load_yaml(path: str) -> dict:
         return {}
 
 
-def load_config_defaults(config_path: str) -> dict:
+def load_config_defaults(
+    llm_config_path: str = None,
+    dataset_config_path: str = None,
+    tool_config_path: str = None,
+) -> dict:
     """
-    从 config 目录或入口 YAML 加载 llm/dataset/tool 配置并合并为 infer 参数字典。
-    config_path 可为目录（如 src/config）或入口文件（如 src/config/infer.yaml）。
+    从三个独立的 YAML 配置文件（llm / dataset / tool）加载并合并为 infer 参数字典。
+
+    使用方式（示例）::
+
+        python infer.py \\
+          --llm_config src/config/llm_config/llm_for_test.yaml \\
+          --dataset_config src/config/dataset_config/example.yaml \\
+          --tool_config src/config/tool_config/example.yaml
+
+    合并规则：
+    - 依次按 llm_config → dataset_config → tool_config 的顺序加载；
+    - 后加载的同名字段会覆盖先前的值；
+    - 缺失的文件会被忽略。
     """
     if not yaml:
         return {}
-    merged = {}
-    base_dir = os.path.dirname(config_path) if os.path.isfile(config_path) else config_path
-    base_dir = os.path.normpath(base_dir)
-
-    if os.path.isfile(config_path):
-        entry = _load_yaml(config_path)
-        if not entry:
-            return {}
-        # 入口文件里指定了子配置路径
-        llm_path = entry.get("llm_config")
-        dataset_path = entry.get("dataset_config")
-        tool_path = entry.get("tool_config")
-        if llm_path or dataset_path or tool_path:
-            for key, subpath in [("llm", llm_path), ("dataset", dataset_path), ("tool", tool_path)]:
-                if not subpath:
-                    continue
-                p = os.path.join(base_dir, subpath) if not os.path.isabs(subpath) else subpath
-                if os.path.isfile(p):
-                    merged.update(_load_yaml(p))
-                elif os.path.isdir(p):
-                    # 目录时使用约定文件名
-                    if key == "llm":
-                        p = os.path.join(p, "llm_for_test.yaml")
-                    elif key == "dataset":
-                        p = os.path.join(p, "example.yaml")
-                    else:
-                        p = os.path.join(p, "example.yaml")
-                    merged.update(_load_yaml(p))
-            # 入口文件中的 overrides 覆盖子配置
-            overrides = entry.get("overrides") or {}
-            merged.update(overrides)
-        else:
-            merged = entry
-    else:
-        # config_path 为目录：按约定加载三个子配置
-        for subpath in [
-            os.path.join(base_dir, "llm_config", "llm_for_test.yaml"),
-            os.path.join(base_dir, "dataset_config", "example.yaml"),
-            os.path.join(base_dir, "tool_config", "example.yaml"),
-        ]:
-            merged.update(_load_yaml(subpath))
-
+    merged: dict = {}
+    for p in (llm_config_path, dataset_config_path, tool_config_path):
+        if not p:
+            continue
+        # 允许相对路径；相对于当前工作目录解析
+        if not os.path.isabs(p):
+            p = os.path.normpath(os.path.join(os.getcwd(), p))
+        if os.path.isfile(p):
+            merged.update(_load_yaml(p))
     return _config_to_infer_defaults(merged)
 
 
@@ -166,33 +146,76 @@ def _config_to_infer_defaults(c: dict) -> dict:
 
 
 def parse_arguments():
-    """先根据 --config 加载默认配置，再解析全部参数；命令行参数覆盖配置文件。"""
-    # 第一轮：只解析 --config
+    """
+    解析推理参数。
+
+    配置只通过三个显式 YAML 文件提供：
+      --llm_config     : LLM & vLLM 相关配置
+      --dataset_config : 数据集相关配置
+      --tool_config    : 各类工具（python/read/search 等）配置
+
+    这三个文件会被依次加载并合并为默认参数；命令行显式传入的参数仍然可以覆盖它们。
+    不再支持旧版的 --config 入口/目录模式。
+    """
+    # 第一轮：只解析三个配置文件路径，以便构建默认参数
     config_parser = argparse.ArgumentParser(add_help=False)
     config_parser.add_argument(
-        "--config",
+        "--llm_config",
         type=str,
         default=None,
-        help="Config directory or path to infer config YAML (default: src/config)",
+        help="Path to LLM config YAML (required unless all key LLM args are provided via CLI).",
+    )
+    config_parser.add_argument(
+        "--dataset_config",
+        type=str,
+        default=None,
+        help="Path to dataset config YAML (required unless dataset args are provided via CLI).",
+    )
+    config_parser.add_argument(
+        "--tool_config",
+        type=str,
+        default=None,
+        help="Path to tool config YAML (optional; python/read/search defaults can also be set via CLI).",
     )
     config_args, _ = config_parser.parse_known_args()
-    config_path = config_args.config or DEFAULT_CONFIG_DIR
-    if not os.path.isabs(config_path):
-        config_path = os.path.normpath(os.path.join(os.getcwd(), config_path))
 
     defaults = {}
-    if yaml and (os.path.isdir(config_path) or os.path.isfile(config_path)):
-        defaults = load_config_defaults(config_path)
+    if yaml:
+        defaults = load_config_defaults(
+            llm_config_path=config_args.llm_config,
+            dataset_config_path=config_args.dataset_config,
+            tool_config_path=config_args.tool_config,
+        )
         if defaults:
-            print(f"[infer] Loaded config defaults from: {config_path}")
+            loaded_from = []
+            if config_args.llm_config:
+                loaded_from.append(f"llm={config_args.llm_config}")
+            if config_args.dataset_config:
+                loaded_from.append(f"dataset={config_args.dataset_config}")
+            if config_args.tool_config:
+                loaded_from.append(f"tool={config_args.tool_config}")
+            print(f"[infer] Loaded config defaults from: {', '.join(loaded_from) if loaded_from else 'CLI only'}")
 
     # 第二轮：完整 parser
     parser = argparse.ArgumentParser(description="Asynchronous inference engine")
+    # 为了兼容帮助信息，这里仍然暴露三个配置参数，但它们只用于显示；真正的默认值已在第一轮解析时应用。
     parser.add_argument(
-        "--config",
+        "--llm_config",
         type=str,
         default=None,
-        help="Config directory or path (already applied as defaults)",
+        help="Path to LLM config YAML (already applied as defaults if provided).",
+    )
+    parser.add_argument(
+        "--dataset_config",
+        type=str,
+        default=None,
+        help="Path to dataset config YAML (already applied as defaults if provided).",
+    )
+    parser.add_argument(
+        "--tool_config",
+        type=str,
+        default=None,
+        help="Path to tool config YAML (already applied as defaults if provided).",
     )
 
     vllm_group = parser.add_argument_group("VLLM Configuration")
@@ -336,12 +359,14 @@ def parse_arguments():
     )
     inference_group.add_argument(
         "--use_tool",
-        action="store_true",
-        default=defaults.get("use_tool", True),
+        type=str,
+        default=None,
+        choices=["true", "false", "1", "0"],
+        metavar="true|false",
         help=(
-            "Whether the model is allowed to call tools via tag-based protocols "
-            "(e.g., <search>/<python>/<result> or interaction tools). "
-            "When disabled, PromptManager will use no-tool sub-templates."
+            "Whether the model is allowed to call tools (true/false). "
+            "If not set, value is read from config. "
+            "When disabled, PromptManager uses no-tool sub-templates."
         ),
     )
 
@@ -527,6 +552,12 @@ def parse_arguments():
     )
 
     args = parser.parse_args()
+
+    # --use_tool: 命令行可传 true/false；未传则用配置
+    if args.use_tool is not None:
+        args.use_tool = str(args.use_tool).strip().lower() in ("true", "1")
+    else:
+        args.use_tool = bool(defaults.get("use_tool", True))
 
     # 若未从配置中获得必需字段，则要求命令行提供
     if not args.endpoints:
