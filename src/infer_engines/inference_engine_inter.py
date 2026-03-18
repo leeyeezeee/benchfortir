@@ -73,8 +73,8 @@ class AsyncInteractionInference:
         self.data_loader = InteractionDataLoader(self.args)
 
         # Customer side: fixed OpenAI-compatible client (e.g., Kimi)
-        customer_api_key = getattr(args, "customer_api_key", None)
-        customer_base_url = getattr(args, "customer_base_url", None)
+        customer_api_key = getattr(args, "customer_api_key", "sk-OK1D7Doqabb8b7KmKfuLoS3AQc3UxfKacV0vA0vAuSogbZ3l")
+        customer_base_url = getattr(args, "customer_base_url", "https://api.moonshot.cn/v1")
         if not customer_api_key or not customer_base_url:
             raise RuntimeError(
                 "customer_api_key and customer_base_url must be provided in args for the customer model."

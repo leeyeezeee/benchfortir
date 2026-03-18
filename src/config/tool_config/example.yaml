@@ -1,8 +1,8 @@
 # ========== 工具配置（infer 推理时使用的全部工具参数） ==========
 
 # ----- Python 执行器 -----
-conda_path: null              # Conda 安装路径，用于执行 <python> 代码块
-conda_env: null               # Conda 环境名
+conda_path: conda_path: /root/miniconda3
+conda_env: tool              # Conda 安装路径，用于执行 <python> 代码块              # Conda 环境名
 python_max_concurrent: 32      # Python 执行器最大并发数
 max_python_times: 5           # 单样本最多调用 Python 工具次数
 
@@ -19,7 +19,7 @@ local_search_url: null       # 本地检索服务地址，如 host:port
 compatible_search: false     # true 时按 dataset_name 自动选 local（2wiki/bamboogle/musique/hotpotqa）或 web
 
 # Bing / 网页搜索
-bing_api_key: ""
+bing_api_key: "1fe0c252-f2e3-40b2-8e9b-096e74e60465"
 bing_zone: serp_api1
 search_max_results: 10
 search_result_length: 1000
