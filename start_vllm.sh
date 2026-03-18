@@ -8,7 +8,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/llm_for_test.yaml}"
+LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_4B.yaml}"
 GPUS="${GPUS:-0,1,2,3}"
 BASE_PORT="${BASE_PORT:-8001}"
 HOST="${HOST:-0.0.0.0}"
