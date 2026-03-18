@@ -49,7 +49,7 @@ for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
     --use_tool true \
     --output_path "$OUTPUT_DIR_TOOL" \
     --endpoints "${ENDPOINTS[@]}" \
-
+    2>/dev/null 
   echo "========== Infer (use_tool=false): $name =========="
   python infer.py \
     --llm_config "$LLM_CONFIG" \
@@ -57,6 +57,7 @@ for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
     --tool_config "$TOOL_CONFIG" \
     --use_tool false \
     --output_path "$OUTPUT_DIR_NOTOOL" \
-    --endpoints "${ENDPOINTS[@]}"
+    --endpoints "${ENDPOINTS[@]}" \
+    2>/dev/null
 done
 
