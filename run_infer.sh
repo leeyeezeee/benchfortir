@@ -38,14 +38,13 @@ for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
 
   # Extract dataset fields via python (no external yq dependency)
   read -r DATASET_NAME DATA_PATH COUNTS PROMPT_TYPE SAMPLE_TIMEOUT < <(
-    python - <<'PY'
+    python - "$dataset_config" <<'PY'
 import sys, yaml
 path = sys.argv[1]
 with open(path, "r", encoding="utf-8") as f:
     d = yaml.safe_load(f) or {}
 print(d.get("dataset_name",""), d.get("data_path",""), d.get("counts",""), d.get("prompt_type",""), d.get("sample_timeout",""))
 PY
-    "$dataset_config"
   )
 
   python infer.py \
