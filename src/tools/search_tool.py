@@ -107,7 +107,7 @@ class BingSearchTool(BaseTool):
         """
         encoded_query = self._pack_query(query)
         target_url = f"https://www.bing.com/search?{encoded_query}&brd_json=1&cc={self._location}"
-
+        print(self._api_key)
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
