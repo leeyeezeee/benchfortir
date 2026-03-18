@@ -49,7 +49,7 @@ for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
     --use_tool true \
     --output_path "$OUTPUT_DIR_TOOL" \
     --endpoints "${ENDPOINTS[@]}" \
-    --print_keys true
+    --print_keys
 
   echo "========== Infer (use_tool=false): $name =========="
   python infer.py \
