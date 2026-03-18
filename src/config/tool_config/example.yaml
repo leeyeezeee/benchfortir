@@ -23,12 +23,12 @@ bing_api_key: "1fe0c252-f2e3-40b2-8e9b-096e74e60465"
 bing_zone: serp_api1
 search_max_results: 10
 search_result_length: 1000
-bing_requests_per_second: 2.0
+bing_requests_per_second: 0.5
 bing_max_retries: 3
 bing_retry_delay: 1.0
 search_cache_file: search_cache.db
 url_cache_file: search_url_cache.db
-max_search_times: 3           # 单样本最多调用搜索次数
+max_search_times: 2           # 单样本最多调用搜索次数
 
 # ----- 摘要模型（搜索结果过长时用于压缩） -----
 summ_model_urls:
