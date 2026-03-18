@@ -11,7 +11,9 @@ import argparse
 import os
 import subprocess
 import sys
-from typing import Any, Dict
+import signal
+import time
+from typing import Any, Dict, Optional, Tuple, List
 
 try:
     import yaml
@@ -82,6 +84,138 @@ def build_vllm_command(config: Dict[str, Any]) -> (Dict[str, str], list):
     return env, cmd
 
 
+def _parse_gpus(gpus: str) -> list:
+    if not gpus:
+        return []
+    items = []
+    for x in str(gpus).split(","):
+        x = x.strip()
+        if not x:
+            continue
+        items.append(x)
+    return items
+
+
+def _spawn_vllm(
+    *,
+    cmd: list,
+    env: Dict[str, str],
+    error_only: bool,
+    stderr_path: Optional[str],
+):
+    if error_only:
+        stdout = subprocess.DEVNULL
+    else:
+        stdout = sys.stdout
+
+    if stderr_path:
+        os.makedirs(os.path.dirname(stderr_path), exist_ok=True)
+        stderr_f = open(stderr_path, "ab", buffering=0)
+        stderr = stderr_f
+    else:
+        stderr_f = None
+        stderr = sys.stderr
+
+    proc = subprocess.Popen(cmd, env=env, stdout=stdout, stderr=stderr)
+    return proc, stderr_f
+
+
+def deploy_multi_vllm(
+    config_path: str,
+    gpus: str,
+    base_port: int,
+    host: str,
+    error_only: bool,
+    log_dir: Optional[str],
+    startup_sleep: float,
+):
+    config = load_config(config_path)
+    vllm_cfg = config.get("vllm", {}) or {}
+    if bool(vllm_cfg.get("remote", False)):
+        raise ValueError("multi-instance mode requires vllm.remote = false (local serve).")
+
+    gpu_list = _parse_gpus(gpus)
+    if not gpu_list:
+        raise ValueError("--gpus is required in multi-instance mode, e.g. --gpus 0,1,2,3")
+
+    procs: List[subprocess.Popen] = []
+    opened_logs = []
+
+    stopping = {"flag": False}
+
+    def _stop_all(signum=None, frame=None):
+        if stopping["flag"]:
+            return
+        stopping["flag"] = True
+        for p in procs:
+            try:
+                if p.poll() is None:
+                    p.terminate()
+            except Exception:
+                pass
+        time.sleep(1.0)
+        for p in procs:
+            try:
+                if p.poll() is None:
+                    p.kill()
+            except Exception:
+                pass
+
+    signal.signal(signal.SIGINT, _stop_all)
+    signal.signal(signal.SIGTERM, _stop_all)
+
+    for i, gpu in enumerate(gpu_list):
+        port = int(base_port) + i
+
+        # Override per-instance fields.
+        cfg_i = dict(config)
+        vllm_i = dict(vllm_cfg)
+        vllm_i["gpu_ids"] = str(gpu)
+        vllm_i["port"] = int(port)
+        vllm_i["host"] = host or vllm_i.get("host", "0.0.0.0")
+        cfg_i["vllm"] = vllm_i
+
+        env, cmd = build_vllm_command(cfg_i)
+
+        stderr_path = None
+        if log_dir:
+            model_tag = str(cfg_i.get("default_model") or cfg_i.get("llm_name") or "model")
+            safe_tag = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in model_tag)
+            stderr_path = os.path.join(log_dir, f"vllm_{safe_tag}_gpu{gpu}_port{port}.err.log")
+
+        proc, stderr_f = _spawn_vllm(cmd=cmd, env=env, error_only=error_only, stderr_path=stderr_path)
+        procs.append(proc)
+        if stderr_f is not None:
+            opened_logs.append(stderr_f)
+
+        print(f"[deploy] started vLLM pid={proc.pid} gpu={gpu} port={port}", file=sys.stderr if error_only else sys.stdout)
+        if startup_sleep and startup_sleep > 0:
+            time.sleep(float(startup_sleep))
+
+    # Wait for all; if any exits unexpectedly, stop the rest.
+    try:
+        while True:
+            alive = 0
+            for p in procs:
+                if p.poll() is None:
+                    alive += 1
+            if alive == 0:
+                break
+            # If one died while others alive, stop all to avoid dangling.
+            for p in procs:
+                if p.poll() is not None and alive > 0:
+                    _stop_all()
+                    break
+            time.sleep(0.5)
+    finally:
+        _stop_all()
+        for f in opened_logs:
+            try:
+                f.close()
+            except Exception:
+                pass
+
+
 def deploy_local_vllm(config_path: str):
     config = load_config(config_path)
     vllm_cfg = config.get("vllm", {}) or {}
@@ -125,12 +259,58 @@ def parse_args():
         required=True,
         help="路径：llm_config 配置文件，例如 src/config/llm_config/llm_for_test.yaml",
     )
+    parser.add_argument(
+        "--gpus",
+        type=str,
+        default="",
+        help='多实例模式：GPU 列表（逗号分隔），例如 "0,1,2,3"；为空则按配置启动单实例。',
+    )
+    parser.add_argument(
+        "--base_port",
+        type=int,
+        default=8001,
+        help="多实例模式：起始端口（后续实例按 +1 递增）。",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="多实例模式：绑定 host（默认 0.0.0.0）。",
+    )
+    parser.add_argument(
+        "--error_only",
+        action="store_true",
+        help="仅输出错误日志：vLLM stdout 丢弃，stderr 记录到文件（需 --log_dir）或终端。",
+    )
+    parser.add_argument(
+        "--log_dir",
+        type=str,
+        default="logs",
+        help="多实例模式：错误日志目录（默认 logs）。为空则不写文件。",
+    )
+    parser.add_argument(
+        "--startup_sleep",
+        type=float,
+        default=0.0,
+        help="多实例模式：每个实例启动后等待秒数（避免同时加载造成抖动）。",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    deploy_local_vllm(args.config)
+    if args.gpus:
+        deploy_multi_vllm(
+            config_path=args.config,
+            gpus=args.gpus,
+            base_port=args.base_port,
+            host=args.host,
+            error_only=bool(args.error_only),
+            log_dir=(args.log_dir if str(args.log_dir).strip() else None),
+            startup_sleep=float(args.startup_sleep or 0.0),
+        )
+    else:
+        deploy_local_vllm(args.config)
 
 
 if __name__ == "__main__":
