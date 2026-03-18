@@ -217,6 +217,12 @@ def parse_arguments():
         default=None,
         help="Path to tool config YAML (already applied as defaults if provided).",
     )
+    parser.add_argument(
+        "--print_keys",
+        action="store_true",
+        default=False,
+        help="Print full API keys at startup (DANGEROUS; for debugging only).",
+    )
 
     vllm_group = parser.add_argument_group("VLLM Configuration")
     vllm_group.add_argument(
@@ -572,6 +578,12 @@ def parse_arguments():
 
 def get_inference_instance():
     args = parse_arguments()
+    # Print args for debugging. WARNING: --print_keys will print sensitive values.
+    if getattr(args, "print_keys", False):
+        print("[infer] --- SENSITIVE DEBUG (print_keys enabled) ---")
+        print(f"[infer] bing_api_key={args.bing_api_key}")
+        print(f"[infer] api_keys={args.api_keys}")
+        print("[infer] --- END SENSITIVE DEBUG ---")
     print(vars(args))
 
     # When running interaction task, switch to interaction inference engine
