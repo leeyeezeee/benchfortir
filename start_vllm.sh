@@ -19,20 +19,27 @@ PID_FILE="${PID_FILE:-.vllm_deploy.pid}"
 echo "[start_vllm] Using config: ${LLM_CONFIG}"
 echo "[start_vllm] GPUS=${GPUS} BASE_PORT=${BASE_PORT} HOST=${HOST}"
 
+# Important:
+# - Do NOT redirect stdout/stderr so errors are visible in terminal.
+# - Background the deployer and immediately disown it, so that the parent shell
+#   exiting (e.g. wrapper script finished) won't send SIGHUP to terminate it.
 python deploy.py \
   --config "$LLM_CONFIG" \
   --gpus "$GPUS" \
   --base_port "$BASE_PORT" \
   --host "$HOST" \
-  --error_only \
   --log_dir "" \
   --startup_sleep "$STARTUP_SLEEP" \
-  1>/dev/null &
+  &
 
 DEPLOY_PID=$!
 echo "$DEPLOY_PID" > "$PID_FILE"
 
+# prevent bash from sending SIGHUP to this background job on exit
+disown "$DEPLOY_PID" 2>/dev/null || true
+
 echo "[start_vllm] Started vLLM deployer (PID=$DEPLOY_PID)."
 echo "[start_vllm] PID saved to $PID_FILE"
 echo "[start_vllm] Wait for readiness before running inference."
+echo "[start_vllm] To stop: kill -INT $DEPLOY_PID  (or kill -TERM $DEPLOY_PID)"
 
