@@ -13,7 +13,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/llm_for_test.yaml}"
+LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_4B.yaml}"
 TOOL_CONFIG="${TOOL_CONFIG:-src/config/tool_config/example.yaml}"
 DATASET_CONFIG_DIR="${DATASET_CONFIG_DIR:-src/config/dataset_config}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results_tool}"
