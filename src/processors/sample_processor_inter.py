@@ -3,6 +3,7 @@ import os
 
 sys.path.append(os.getcwd())
 
+import asyncio
 import json
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -223,8 +224,8 @@ class SampleProcessorInter:
                 }
             )
 
-            # Customer turn via Kimi (run_customer_turn_kimi)
-            cust = self._run_customer_turn_kimi()
+            # Customer turn via Kimi — sync OpenAI client runs in thread pool to avoid blocking asyncio loop
+            cust = await asyncio.to_thread(self._run_customer_turn_kimi)
 
             message = str(cust.get("message", "")).strip()
             self.satisfied = bool(cust.get("satisfied", False))
@@ -269,7 +270,7 @@ class SampleProcessorInter:
 
     def _run_customer_turn_kimi(self) -> Dict[str, Any]:
         """
-        Run one customer (Kimi) turn.
+        Run one customer (Kimi) turn (sync HTTP). Invoked via asyncio.to_thread from run().
 
         Customer outputs strict JSON:
           {message, satisfied, score, reason}
