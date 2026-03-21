@@ -56,4 +56,3 @@ for name in $DATASET_NAMES_NOTOOL; do
     --endpoints "${ENDPOINTS[@]}" \
     2>/dev/null
 done
-
