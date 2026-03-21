@@ -2,7 +2,7 @@
 # DataLoader: else branch → question, answer
 # 数据文件：{data_path}/{dataset_name}/test.jsonl
 
-dataset_name: math500
+dataset_name: math
 data_path: data
 output_path: results
 prompt_type: math

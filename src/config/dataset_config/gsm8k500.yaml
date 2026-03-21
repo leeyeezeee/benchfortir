@@ -1,4 +1,4 @@
-dataset_name: gsm8k500
+dataset_name: gsm8k
 data_path: data
 output_path: results
 prompt_type: math
