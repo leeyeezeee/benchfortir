@@ -129,6 +129,16 @@ class DataLoader:
                     answers.append(data["answer"])
                     choices.append(data['options'])
                     formats.append("Multiple-choice")
+        elif self.dataset_name.lower() == "simpleqa":
+            with open(self.data_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    data = json.loads(line)
+                    questions.append(data["question"])
+                    ans = data.get("answer")
+                    if isinstance(ans, list):
+                        answers.append(ans[0] if ans else "")
+                    else:
+                        answers.append(ans if ans is not None else "")
         else:
             with open(self.data_path, "r", encoding="utf-8") as f:
                 for line in f:
