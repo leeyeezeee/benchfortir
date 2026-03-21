@@ -5,6 +5,7 @@
 
 dataset_name: interaction
 data_path: data
+# 与 gsm8k500 等一致：output_path 为输出目录；结果文件为 {output_path}/{dataset}_{default_model}_output.jsonl
 output_path: results
 prompt_type: interaction
 sample_timeout: 600

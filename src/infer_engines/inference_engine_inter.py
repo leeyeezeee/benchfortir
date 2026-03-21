@@ -57,6 +57,32 @@ def _resolve_customer_credentials(args: Any) -> Tuple[str, str]:
     return api_key, base_url
 
 
+def _resolve_interaction_output_jsonl(args: Any) -> str:
+    """
+    与 AsyncInference.run 一致：args.output_path 表示输出目录时，写入
+    ``{output_path}/{dataset_name}_{llm_name}_output.jsonl``（llm_name 缺省用 default_model）。
+
+    若用户显式传入以 ``.jsonl`` 结尾的文件路径（且该路径不是已存在的目录），则直接作为结果文件路径。
+    """
+    raw = getattr(args, "output_path", None) or "results"
+    norm = os.path.normpath(
+        raw if os.path.isabs(raw) else os.path.join(os.getcwd(), raw)
+    )
+
+    if os.path.isdir(norm):
+        out_dir = norm
+    elif str(raw).endswith(".jsonl") or norm.endswith(".jsonl"):
+        return norm
+    else:
+        out_dir = norm
+
+    llm = getattr(args, "llm_name", None) or getattr(args, "default_model", "model")
+    safe_llm = str(llm).replace("\\", "_").replace("/", "_")
+    ds = getattr(args, "dataset_name", "interaction")
+    fname = f"{ds}_{safe_llm}_output.jsonl"
+    return os.path.join(out_dir, fname)
+
+
 class AsyncInteractionInference:
     """
     Interaction (Task1) inference engine.
@@ -113,8 +139,8 @@ class AsyncInteractionInference:
         self.customer_temperature = getattr(args, "customer_temperature", 0.2)
         self.customer_max_tokens = getattr(args, "customer_max_tokens", 2048)
 
-        # Output path for interaction traces
-        self.output_path = getattr(args, "output_path", "interaction_outputs.jsonl")
+        # 最终 JSONL 路径在 run() 中由 _resolve_interaction_output_jsonl 解析（与 AsyncInference 目录 + 文件名一致）
+        self.output_path: str = ""
 
         # Concurrency
         self.max_concurrent = getattr(args, "max_concurrent_requests", 10)
@@ -139,7 +165,17 @@ class AsyncInteractionInference:
             _add(getattr(self.args, "data_path", None))
             output_path = getattr(self.args, "output_path", None)
             if output_path:
-                _add(os.path.dirname(output_path) or ".")
+                abs_out = os.path.abspath(
+                    output_path
+                    if os.path.isabs(output_path)
+                    else os.path.join(os.getcwd(), output_path)
+                )
+                if os.path.isdir(abs_out):
+                    _add(abs_out)
+                elif str(output_path).endswith(".jsonl") or abs_out.endswith(".jsonl"):
+                    _add(os.path.dirname(abs_out) or ".")
+                else:
+                    _add(abs_out)
 
         return roots or [os.getcwd()]
 
@@ -220,7 +256,8 @@ class AsyncInteractionInference:
         elapsed = time.time() - start_time
         print(f"Interaction inference finished in {elapsed/60:.2f} min")
 
-        # Save JSONL results: one scenario per line
+        # Save JSONL results: one scenario per line（output_path 为目录时与 AsyncInference 命名一致）
+        self.output_path = _resolve_interaction_output_jsonl(self.args)
         out_dir = os.path.dirname(self.output_path) or "."
         os.makedirs(out_dir, exist_ok=True)
         with open(self.output_path, "w", encoding="utf-8") as f:
