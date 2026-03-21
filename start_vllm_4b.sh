@@ -9,8 +9,6 @@ cd "$(dirname "$0")"
 LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_4B.yaml}"
 export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"
 
-PID_FILE="${PID_FILE:-.vllm_deploy.pid}"
-
 echo "[start_vllm] Using config: ${LLM_CONFIG} VLLM_TOTAL_GPUS=${VLLM_TOTAL_GPUS}"
 
 python deploy.py \
@@ -18,10 +16,8 @@ python deploy.py \
   &
 
 DEPLOY_PID=$!
-echo "$DEPLOY_PID" > "$PID_FILE"
 
 disown "$DEPLOY_PID" 2>/dev/null || true
 
 echo "[start_vllm] Started deploy.py (PID=$DEPLOY_PID); vLLM stderr goes to this terminal"
-echo "[start_vllm] PID saved to $PID_FILE (deploy.py parent process)"
 echo "[start_vllm] Wait for readiness on ports from vllm.port upward."

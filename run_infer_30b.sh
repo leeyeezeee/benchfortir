@@ -8,8 +8,8 @@ cd "$(dirname "$0")"
 LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_30b.yaml}"
 TOOL_CONFIG="${TOOL_CONFIG:-src/config/tool_config/example.yaml}"
 DATASET_CONFIG_DIR="${DATASET_CONFIG_DIR:-src/config/dataset_config}"
-OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results_tool_30b}"
-OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results_notool_30b}"
+OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_30b}"
+OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_30b}"
 
 export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"
 mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL" logs
