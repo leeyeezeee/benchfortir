@@ -5,9 +5,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_8B.yaml}"
-TOOL_CONFIG="${TOOL_CONFIG:-src/config/tool_config/example.yaml}"
-DATASET_CONFIG_DIR="${DATASET_CONFIG_DIR:-src/config/dataset_config}"
+# infer.py 只接受配置文件名（stem），对应 src/config/<llm_config|dataset_config|tool_config>/
+LLM_CONFIG="${LLM_CONFIG:-Qwen3_8B}"
+TOOL_CONFIG="${TOOL_CONFIG:-example}"
+: "${DATASET_NAMES:=expodesign math500 gsm8k500 omini500 hotpotqa interaction}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_8b}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_8b}"
 
@@ -26,16 +27,16 @@ ENDPOINTS=(
 echo "[run_infer_8b] Endpoints: ${ENDPOINTS[*]}"
 
 echo "[run_infer_8b] Using already-deployed vLLM (LLM_CONFIG=$LLM_CONFIG, VLLM_TOTAL_GPUS=$VLLM_TOTAL_GPUS)."
+echo "[run_infer_8b] DATASET_NAMES: $DATASET_NAMES"
 
 echo "[run_infer_8b] Waiting for vLLM to be ready..."
 sleep "${WAIT_FOR_VLLM_SECONDS:-10}"
 
-for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
-  name=$(basename "$dataset_config" .yaml)
+for name in $DATASET_NAMES; do
   echo "========== Infer (use_tool=true): $name =========="
   python infer.py \
     --llm_config "$LLM_CONFIG" \
-    --dataset_config "$dataset_config" \
+    --dataset_config "$name" \
     --tool_config "$TOOL_CONFIG" \
     --use_tool true \
     --output_path "$OUTPUT_DIR_TOOL" \
@@ -45,7 +46,7 @@ for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
   echo "========== Infer (use_tool=false): $name =========="
   python infer.py \
     --llm_config "$LLM_CONFIG" \
-    --dataset_config "$dataset_config" \
+    --dataset_config "$name" \
     --tool_config "$TOOL_CONFIG" \
     --use_tool false \
     --output_path "$OUTPUT_DIR_NOTOOL" \

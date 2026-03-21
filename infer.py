@@ -4,6 +4,7 @@ sys.path.append(os.getcwd())
 import asyncio
 import argparse
 import nltk
+from typing import Optional
 # print(nltk.data.path)
 # nltk.download('punkt')
 # nltk.download('punkt_tab')
@@ -32,6 +33,42 @@ def _load_yaml(path: str) -> dict:
         return {}
 
 
+def resolve_config_yaml_path(raw: Optional[str], config_subdir: str) -> Optional[str]:
+    """
+    仅根据「文件名」解析 YAML 路径，不接受目录或路径字符串。
+
+    解析规则：``<cwd>/src/config/<config_subdir>/<stem>.yaml``（若不存在则尝试 ``.yml``）。
+    参数须为 stem（如 ``expodesign``）或带扩展名（``expodesign.yaml``），
+    不得包含 ``/``、``\\`` 等路径分隔符。
+
+    config_subdir: llm_config | dataset_config | tool_config
+    """
+    if not raw:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    if "/" in s or "\\" in s:
+        print(
+            f"[infer] Warning: --{config_subdir} must be a file name only "
+            f"(no path); ignored: {raw!r}"
+        )
+        return None
+    stem = s
+    if stem.lower().endswith(".yaml"):
+        stem = stem[:-5]
+    elif stem.lower().endswith(".yml"):
+        stem = stem[:-4]
+    if not stem:
+        return None
+    base = os.path.join(os.getcwd(), "src", "config", config_subdir)
+    for ext in (".yaml", ".yml"):
+        cand = os.path.join(base, stem + ext)
+        if os.path.isfile(cand):
+            return cand
+    return os.path.join(base, stem + ".yaml")
+
+
 def load_config_defaults(
     llm_config_path: str = None,
     dataset_config_path: str = None,
@@ -40,12 +77,14 @@ def load_config_defaults(
     """
     从三个独立的 YAML 配置文件（llm / dataset / tool）加载并合并为 infer 参数字典。
 
-    使用方式（示例）::
+    使用方式（示例）：只传配置文件名（stem），从固定目录加载::
 
         python infer.py \\
-          --llm_config src/config/llm_config/llm_for_test.yaml \\
-          --dataset_config src/config/dataset_config/example.yaml \\
-          --tool_config src/config/tool_config/example.yaml
+          --llm_config llm_for_test \\
+          --dataset_config example \\
+          --tool_config example
+
+    对应文件为 ``src/config/llm_config/llm_for_test.yaml`` 等；不接受路径，只接受文件名。
 
     合并规则：
     - 依次按 llm_config → dataset_config → tool_config 的顺序加载；
@@ -149,51 +188,66 @@ def parse_arguments():
     """
     解析推理参数。
 
-    配置只通过三个显式 YAML 文件提供：
+    配置只通过三个配置文件名提供（见下方，仅文件名、无路径）：
       --llm_config     : LLM & vLLM 相关配置
       --dataset_config : 数据集相关配置
       --tool_config    : 各类工具（python/read/search 等）配置
 
     这三个文件会被依次加载并合并为默认参数；命令行显式传入的参数仍然可以覆盖它们。
     不再支持旧版的 --config 入口/目录模式。
+
+    配置参数：只传文件名（stem 或 ``name.yaml``），从 ``src/config/<llm_config|dataset_config|tool_config>/`` 加载。
     """
-    # 第一轮：只解析三个配置文件路径，以便构建默认参数
+    # 第一轮：只解析三个配置文件名，以便构建默认参数
     config_parser = argparse.ArgumentParser(add_help=False)
+    _cfg_help = "Config file name only (e.g. expodesign → src/config/<subdir>/expodesign.yaml; no paths). "
     config_parser.add_argument(
         "--llm_config",
         type=str,
         default=None,
-        help="Path to LLM config YAML (required unless all key LLM args are provided via CLI).",
+        help=_cfg_help + "LLM & vLLM (required unless key LLM args are on CLI).",
     )
     config_parser.add_argument(
         "--dataset_config",
         type=str,
         default=None,
-        help="Path to dataset config YAML (required unless dataset args are provided via CLI).",
+        help=_cfg_help + "Dataset (required unless dataset args are on CLI).",
     )
     config_parser.add_argument(
         "--tool_config",
         type=str,
         default=None,
-        help="Path to tool config YAML (optional; python/read/search defaults can also be set via CLI).",
+        help=_cfg_help + "Tools (optional; python/read/search can also be set via CLI).",
     )
     config_args, _ = config_parser.parse_known_args()
+
+    llm_resolved = resolve_config_yaml_path(config_args.llm_config, "llm_config")
+    dataset_resolved = resolve_config_yaml_path(config_args.dataset_config, "dataset_config")
+    tool_resolved = resolve_config_yaml_path(config_args.tool_config, "tool_config")
+
+    for label, raw, resolved in (
+        ("llm_config", config_args.llm_config, llm_resolved),
+        ("dataset_config", config_args.dataset_config, dataset_resolved),
+        ("tool_config", config_args.tool_config, tool_resolved),
+    ):
+        if raw and resolved and not os.path.isfile(resolved):
+            print(f"[infer] Warning: {label} not found: {resolved} (from {raw!r})")
 
     defaults = {}
     if yaml:
         defaults = load_config_defaults(
-            llm_config_path=config_args.llm_config,
-            dataset_config_path=config_args.dataset_config,
-            tool_config_path=config_args.tool_config,
+            llm_config_path=llm_resolved,
+            dataset_config_path=dataset_resolved,
+            tool_config_path=tool_resolved,
         )
         if defaults:
             loaded_from = []
-            if config_args.llm_config:
-                loaded_from.append(f"llm={config_args.llm_config}")
-            if config_args.dataset_config:
-                loaded_from.append(f"dataset={config_args.dataset_config}")
-            if config_args.tool_config:
-                loaded_from.append(f"tool={config_args.tool_config}")
+            if llm_resolved:
+                loaded_from.append(f"llm={llm_resolved}")
+            if dataset_resolved:
+                loaded_from.append(f"dataset={dataset_resolved}")
+            if tool_resolved:
+                loaded_from.append(f"tool={tool_resolved}")
             print(f"[infer] Loaded config defaults from: {', '.join(loaded_from) if loaded_from else 'CLI only'}")
 
     # 第二轮：完整 parser
@@ -203,19 +257,19 @@ def parse_arguments():
         "--llm_config",
         type=str,
         default=None,
-        help="Path to LLM config YAML (already applied as defaults if provided).",
+        help=_cfg_help + "LLM config (already applied as defaults if provided).",
     )
     parser.add_argument(
         "--dataset_config",
         type=str,
         default=None,
-        help="Path to dataset config YAML (already applied as defaults if provided).",
+        help=_cfg_help + "Dataset config (already applied as defaults if provided).",
     )
     parser.add_argument(
         "--tool_config",
         type=str,
         default=None,
-        help="Path to tool config YAML (already applied as defaults if provided).",
+        help=_cfg_help + "Tool config (already applied as defaults if provided).",
     )
     parser.add_argument(
         "--print_keys",
