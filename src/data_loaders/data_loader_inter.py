@@ -4,7 +4,8 @@ import os
 sys.path.append(os.getcwd())
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
 
 
 class InteractionDataLoader:
@@ -23,18 +24,20 @@ class InteractionDataLoader:
 
     def __init__(self, args):
         """
-        Args 约定（可按需要扩展）：
-            args.data_path:     数据根目录（例如项目根或 data 目录）
-            args.dataset_name:  数据集名称，interaction 任务一般为 "interaction"
+        Args 约定（与 DataLoader 对齐）：
+            args.data_path:     数据根目录（如 ``data``）
+            args.dataset_name:  子目录名（如 ``interaction``）
             args.counts:        最多加载多少条（<=0 表示全部）
             args.max_turns:     每个场景的最大对话轮数（默认为 10）
-            args.inter_filename: 场景 JSONL 文件名（默认 "task1_templates.jsonl"）
-            args.inter_data_path: 可选，直接指定 JSONL 的完整路径（优先级高于上述组合）
+            args.inter_filename: 可选，场景 JSONL 文件名；未设则依次尝试
+                ``test.jsonl``、``task1_templates.jsonl``
+            args.inter_data_path: 可选，直接指定 JSONL 完整路径（优先级最高）
         """
         self.counts = getattr(args, "counts", -1)
         self.max_turns = getattr(args, "max_turns", 10)
-        self.data_path = getattr(args, "data_path", "")
-        self.counts = getattr(args, "counts", -1)
+        self.dataset_name = args.dataset_name
+        self.data_path = args.data_path
+        self.data_path = os.path.join(self.data_path, self.dataset_name, 'test.jsonl')
 
     def load_data(self) -> List[Dict[str, Any]]:
         """

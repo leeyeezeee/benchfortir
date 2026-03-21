@@ -1,7 +1,7 @@
 # ========== 数据集配置：Interaction（电商客服多轮对话） ==========
-# InteractionDataLoader 要求 data_path 为场景 JSONL 文件的完整路径（非目录）。
-# 从 evaluation/ 运行时使用：data/interaction/task1_templates.jsonl
-# 从项目根运行时请改为：evaluation/data/interaction/task1_templates.jsonl
+# InteractionDataLoader 与 DataLoader 对齐：data_path + dataset_name + 文件名。
+# 默认依次尝试 data/interaction/test.jsonl、data/interaction/task1_templates.jsonl。
+# 也可用 inter_filename / inter_data_path 覆盖（见 data_loader_inter.py）。
 
 dataset_name: interaction
 data_path: data

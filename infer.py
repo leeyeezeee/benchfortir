@@ -178,6 +178,9 @@ def _config_to_infer_defaults(c: dict) -> dict:
         "customer_temperature": c.get("customer_temperature", 0.2),
         "customer_max_tokens": c.get("customer_max_tokens", 2048),
         "max_turns": c.get("max_turns", 10),
+        # Interaction scenario JSONL（见 data_loader_inter._resolve_interaction_jsonl_path）
+        "inter_filename": c.get("inter_filename"),
+        "inter_data_path": c.get("inter_data_path"),
     }
     if isinstance(c.get("summ_model_urls"), list):
         defaults["summ_model_urls"] = c["summ_model_urls"]
@@ -609,6 +612,18 @@ def parse_arguments():
         type=int,
         default=defaults.get("max_turns", 10),
         help="Maximum dialogue turns per interaction scenario",
+    )
+    interaction_group.add_argument(
+        "--inter_filename",
+        type=str,
+        default=defaults.get("inter_filename"),
+        help="Interaction scenario JSONL file name under data_path/dataset_name/ (default: try test.jsonl then task1_templates.jsonl)",
+    )
+    interaction_group.add_argument(
+        "--inter_data_path",
+        type=str,
+        default=defaults.get("inter_data_path"),
+        help="Optional full path to interaction JSONL (overrides data_path/dataset_name/inter_filename)",
     )
 
     args = parser.parse_args()
