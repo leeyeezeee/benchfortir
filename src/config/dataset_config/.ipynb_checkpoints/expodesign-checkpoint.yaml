@@ -1,0 +1,10 @@
+# ========== 数据集配置：Expodesign（实验设计） ==========
+# DataLoader: else branch → question (含 <domain>/<title>/<url>/<abstract>), answer
+# 任务：根据论文信息产出实验设计 JSON；prompt_type expodesign 启用标签式工具
+# 数据文件：{data_path}/{dataset_name}/test.jsonl
+
+dataset_name: expodesign
+data_path: data
+output_path: results
+prompt_type: expodesign
+sample_timeout: 300

@@ -1,7 +1,7 @@
 # src/config/llm_config/llm_for_test.yaml
 
 # ===== LLM configuration（推理时可复用）=====
-llm_name: qwen3                      # 原来的 llm_nmae，注意修正拼写
+llm_name: qwen3_4b                      # 原来的 llm_nmae，注意修正拼写
 model_path: /root/autodl-tmp/models/Qwen3-4B
 default_model: Qwen3-4B              # vLLM serve 的 --served-model-name，推理时也用这个
 

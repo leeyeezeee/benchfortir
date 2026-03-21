@@ -14,7 +14,7 @@ declare -A task_map=(
     ["bamboogle"]="qa"     # Bamboogle搜索问答数据集
     ["musique"]="qa"       # Musique多跳问答数据集
     ["squadv2"]="qa" 
-    ["nq"]="qa"
+    ["nature_questions"]="qa"
 )
 
 # 设置输出目录路径，用于存放需要评估的结果文件
