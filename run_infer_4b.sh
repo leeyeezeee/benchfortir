@@ -16,7 +16,8 @@ cd "$(dirname "$0")"
 # infer.py 只接受配置文件名（stem），对应 src/config/<llm_config|dataset_config|tool_config>/
 LLM_CONFIG="${LLM_CONFIG:-Qwen3_4B}"
 TOOL_CONFIG="${TOOL_CONFIG:-example}"
-: "${DATASET_NAMES:=interaction expodesign math500 gsm8k500 omini500 hotpotqa}"
+: "${DATASET_NAMES:=interaction expodesign math500 gsm8k500 omini500 hotpotqa simpleqa}"
+: "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa simpleqa}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_4b}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_4b}"
 
@@ -55,7 +56,9 @@ for name in $DATASET_NAMES; do
     --use_tool true \
     --output_path "$OUTPUT_DIR_TOOL" \
     --endpoints "${ENDPOINTS[@]}" \
-    2>/dev/null 
+done
+
+for name in $DATASET_NAMES_NOTOOL; do
   echo "========== Infer (use_tool=false): $name =========="
   python infer.py \
     --llm_config "$LLM_CONFIG" \

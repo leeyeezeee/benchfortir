@@ -9,6 +9,7 @@ cd "$(dirname "$0")"
 LLM_CONFIG="${LLM_CONFIG:-Qwen3_8B}"
 TOOL_CONFIG="${TOOL_CONFIG:-example}"
 : "${DATASET_NAMES:=expodesign math500 gsm8k500 omini500 hotpotqa interaction}"
+: "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa simpleqa}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_8b}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_8b}"
 
@@ -42,7 +43,9 @@ for name in $DATASET_NAMES; do
     --output_path "$OUTPUT_DIR_TOOL" \
     --endpoints "${ENDPOINTS[@]}" \
     2>/dev/null
+done
 
+for name in $DATASET_NAMES_NOTOOL; do
   echo "========== Infer (use_tool=false): $name =========="
   python infer.py \
     --llm_config "$LLM_CONFIG" \
