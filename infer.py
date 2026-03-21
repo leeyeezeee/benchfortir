@@ -139,7 +139,7 @@ def _config_to_infer_defaults(c: dict) -> dict:
         "dataset_name": c.get("dataset_name", "math"),
         "output_path": c.get("output_path"),
         "prompt_type": c.get("prompt_type", "code_search"),
-        "counts": c.get("counts", 100),
+        "counts": c.get("counts", 500),
         "data_path": c.get("data_path"),
         "max_python_times": c.get("max_python_times", 5),
         "max_search_times": c.get("max_search_times", 3),
