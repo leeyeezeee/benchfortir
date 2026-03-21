@@ -30,7 +30,7 @@ from ..processors.sample_processor_inter import SampleProcessorInter
 # Customer (simulated user) OpenAI-compatible API — used when args / YAML omit values.
 _DEFAULT_CUSTOMER_BASE_URL = "https://api.moonshot.cn/v1"
 # Prefer env; last resort matches previous getattr default so merged YAML `null` does not break runs.
-_DEFAULT_CUSTOMER_API_KEY = "sk-OK1D7Doqabb8b7KmKfuLoS3AQc3UxfKacV0vA0vAuSogbZ3l"
+_DEFAULT_CUSTOMER_API_KEY = "sk-IvXK1GcIhwXbaCm62ceqcsUVB1qNbB8upHnhzOOgGVgd5Txq"
 
 
 def _resolve_customer_credentials(args: Any) -> Tuple[str, str]:
