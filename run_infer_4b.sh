@@ -19,18 +19,21 @@ DATASET_CONFIG_DIR="${DATASET_CONFIG_DIR:-src/config/dataset_config}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results_tool}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results_notool}"
 
-GPUS="${GPUS:-0,1,2,3}"
-BASE_PORT="${BASE_PORT:-8001}"
+export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"
 
 mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL"
 
-# Build endpoints list from GPU count / ports
-IFS=',' read -r -a GPU_ARR <<<"$GPUS"
-ENDPOINTS=()
-for i in "${!GPU_ARR[@]}"; do
-  port=$((BASE_PORT + i))
-  ENDPOINTS+=("http://127.0.0.1:${port}/v1")
-done
+# vLLM 多实例端口从 BASE_PORT 递增（4B：tensor_parallel_size=1 → 4 个实例）
+# 注意：这里 endpoints 写死为 base..base+3；确保你部署时的端口起点一致。
+if [ -n "${VLLM_BASE_PORT:-}" ]; then
+  BASE_PORT="${VLLM_BASE_PORT}"
+fi
+ENDPOINTS=(
+  "http://127.0.0.1:8001/v1"
+  "http://127.0.0.1:8002/v1"
+  "http://127.0.0.1:8003/v1"
+  "http://127.0.0.1:8004/v1"
+)
 
 echo "[run_infer_all] Using LLM_CONFIG=$LLM_CONFIG"
 echo "[run_infer_all] Using TOOL_CONFIG=$TOOL_CONFIG"
@@ -38,6 +41,9 @@ echo "[run_infer_all] Using DATASET_CONFIG_DIR=$DATASET_CONFIG_DIR"
 echo "[run_infer_all] Output(use_tool=true)  -> $OUTPUT_DIR_TOOL"
 echo "[run_infer_all] Output(use_tool=false) -> $OUTPUT_DIR_NOTOOL"
 echo "[run_infer_all] Endpoints: ${ENDPOINTS[*]}"
+
+echo "[run_infer_all] Waiting for vLLM to be ready..."
+sleep "${WAIT_FOR_VLLM_SECONDS:-10}"
 
 for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
   name=$(basename "$dataset_config" .yaml)
@@ -60,4 +66,3 @@ for dataset_config in "$DATASET_CONFIG_DIR"/*.yaml; do
     --endpoints "${ENDPOINTS[@]}" \
     2>/dev/null
 done
-

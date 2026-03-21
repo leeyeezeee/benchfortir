@@ -1,9 +1,0 @@
-# ========== 数据集配置：AIME 2025 ==========
-# DataLoader: dataset_name == "aime25" → problem, answer
-# 数据文件：{data_path}/{dataset_name}/test.jsonl
-
-dataset_name: aime25
-data_path: data
-output_path: results
-prompt_type: math
-sample_timeout: 240
