@@ -333,7 +333,7 @@ class AsyncInference:
      # 保存结果到json文件
         output_file = os.path.join(
                     self.args.output_path,
-                    f"{self.args.dataset_name}_{self.args.llm_name}_output.json",
+                    f"{self.args.dataset_name}_output.json",
                 )
         if not os.path.exists(self.args.output_path):
             os.makedirs(self.args.output_path)

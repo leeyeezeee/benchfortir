@@ -259,7 +259,7 @@ class AsyncInteractionInference:
         # Save JSONL results: one scenario per line（output_path 为目录时与 AsyncInference 命名一致）
         output_file = os.path.join(
                     self.args.output_path,
-                    f"{self.args.dataset_name}_{self.args.llm_name}_output.json",
+                    f"{self.args.dataset_name}_output.json",
                 )
         if not os.path.exists(self.args.output_path):
             os.makedirs(self.args.output_path)
