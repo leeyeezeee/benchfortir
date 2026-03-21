@@ -4,7 +4,7 @@ import os
 sys.path.append(os.getcwd())
 
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from ..utils import extract_solution, last_boxed_only_string, remove_boxed
 
@@ -23,12 +23,15 @@ class DataLoader:
         self.data_path = os.path.join(self.data_path, self.dataset_name, 'test.jsonl')
         self.counts = args.counts
 
-    def load_data(self) -> Tuple[List[str], List[str], List[List[str]], List[str]]:
+    def load_data(
+        self,
+    ) -> Tuple[List[str], List[Union[str, List[str]]], List[List[str]], List[str]]:
         """
         Load dataset
 
         Returns:
             (questions, answers, choices, formats)
+            answers 每项通常为 str；squadv2 可答题为 List[str]（多参考 span 去重后的文本，供 max EM/F1）。
         """
         questions = []
         answers = []
@@ -139,6 +142,32 @@ class DataLoader:
                         answers.append(ans[0] if ans else "")
                     else:
                         answers.append(ans if ans is not None else "")
+        elif self.dataset_name.lower() == "squadv2":
+            # SQuAD 2.0：仅 question + answers；不使用 context / plausible_answers。
+            # 不可回答：金标为 ""；可答：多 span 去重后的文本列表，与官方 max EM/F1 一致。
+            with open(self.data_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    data = json.loads(line)
+                    questions.append(data["question"])
+                    raw_answers = data.get("answers") or []
+                    if data.get("is_impossible") or not raw_answers:
+                        answers.append("")
+                    else:
+                        seen = set()
+                        texts: List[str] = []
+                        for a in raw_answers:
+                            if isinstance(a, dict):
+                                t = (a.get("text") or "").strip()
+                            else:
+                                t = str(a).strip()
+                            if t and t not in seen:
+                                seen.add(t)
+                                texts.append(t)
+                        if not texts:
+                            answers.append("")
+                        else:
+                            # 统一为 list，便于评测侧对多参考取 max EM/F1（单条时为单元素列表）
+                            answers.append(texts)
         else:
             with open(self.data_path, "r", encoding="utf-8") as f:
                 for line in f:

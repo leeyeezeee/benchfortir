@@ -394,6 +394,8 @@ class Evaluator:
         """Evaluate a single sample record and return the per-sample metrics dict."""
         question = item.get("input", "")
         answer = item.get("answer", "")
+        if self.task_type == "math" and isinstance(answer, list):
+            answer = str(answer[0]) if answer else ""
         prediction = item.get("prediction", "")
         output = item.get("output", "")
         instruction = item.get("instruction", "")
@@ -498,9 +500,14 @@ class Evaluator:
         # Optional LLM judge
         if self.use_llm and self.llm_evaluator and self.task_type in ["qa", "math"]:
             semaphore = asyncio.Semaphore(self.concurrent_limit)
+            labeled_for_llm = (
+                json.dumps(answer, ensure_ascii=False)
+                if isinstance(answer, list)
+                else answer
+            )
             is_correct, llm_reason_answer = await self.llm_evaluator.evaluate(
                 question=question,
-                labeled_answer=answer,
+                labeled_answer=labeled_for_llm,
                 pred_answer=prediction,
                 semaphore=semaphore,
             )

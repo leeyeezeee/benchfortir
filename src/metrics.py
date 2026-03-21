@@ -2,6 +2,7 @@ import sys
 import os
 sys.path.append(os.getcwd())
 
+import json
 import re
 import string
 from typing import Dict, Any, List, Union, Optional, Tuple, Set
@@ -82,6 +83,8 @@ def evaluate_math_prediction(prediction: str, reference: str) -> Dict[str, Union
 def evaluate_qa_prediction(prediction: str, references: Union[str, List[str], bool]) -> Dict[str, Union[int, float]]:
     """Evaluate QA prediction result.
 
+    多参考时与 SQuAD 常见设定一致：对每个 reference 算 EM/F1，再取 **max**（见循环内 max）。
+
     This uses SQuAD-style normalization by default:
     - lowercasing
     - removing articles (a/an/the)
@@ -97,12 +100,20 @@ def evaluate_qa_prediction(prediction: str, references: Union[str, List[str], bo
     Returns:
         Dict[str, Union[int, float]] with keys: em, acc, f1, math_equal.
     """
-    # Ensure references is a list
+    # Ensure references is a list[str]
     if isinstance(references, str):
-        if not references.startswith("["):
-            references = [references]
+        s = references.strip()
+        if s.startswith("["):
+            try:
+                parsed = json.loads(references)
+                if isinstance(parsed, list):
+                    references = [str(x) for x in parsed]
+                else:
+                    references = [references]
+            except (json.JSONDecodeError, TypeError):
+                references = [references]
         else:
-            references = [e.strip() for e in re.split(r",\s*", references.strip("[]"))]
+            references = [references]
 
     # Handle boolean answers
     if isinstance(references, list) and all(isinstance(r, bool) for r in references):
@@ -119,11 +130,19 @@ def evaluate_qa_prediction(prediction: str, references: Union[str, List[str], bo
         for reference in references:  # type: ignore[assignment]
             normalized_reference = normalize_answer(reference, remove_articles=True, remove_punctuations=True)
 
-            em = int(normalized_prediction == normalized_reference)
-            acc = int(normalized_reference in normalized_prediction)
+            if not normalized_reference:
+                # 无答案金标（如 SQuAD 2.0 不可答）：不能用 "" in pred（恒为 True）
+                em = int(not normalized_prediction)
+                acc = em
+                f1 = 1.0 if not normalized_prediction else 0.0
+            else:
+                em = int(normalized_prediction == normalized_reference)
+                acc = int(normalized_reference in normalized_prediction)
 
-            num_same, pred_len, ref_len = compute_token_overlap(normalized_prediction, normalized_reference)
-            f1 = compute_f1_score(num_same, pred_len, ref_len)
+                num_same, pred_len, ref_len = compute_token_overlap(
+                    normalized_prediction, normalized_reference
+                )
+                f1 = compute_f1_score(num_same, pred_len, ref_len)
 
             result["em"] = max(int(result["em"]), em)
             result["acc"] = max(int(result["acc"]), acc)

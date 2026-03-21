@@ -5,7 +5,7 @@ import os
 
 from vllm import SamplingParams
 from transformers import AutoTokenizer
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional, Union
 from tqdm.asyncio import tqdm as async_tqdm
 
 from ..prompt_manager import PromptManager
@@ -170,7 +170,12 @@ class AsyncInference:
 
     # 处理单个样本，返回推理结果
     async def process_sample(
-        self, question: str, golden_answer: str, choice: str, format: str, session_id: Optional[str] = None
+        self,
+        question: str,
+        golden_answer: Union[str, List[str]],
+        choice: str,
+        format: str,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         # 构造样本状态字典
         sample_stat = {
@@ -198,7 +203,9 @@ class AsyncInference:
         return sample_stat
 
     # 包装样本处理，增加超时和异常处理
-    async def process_sample_wrap(self, idx, question, answer, choice, format):
+    async def process_sample_wrap(
+        self, idx, question, answer: Union[str, List[str]], choice, format
+    ):
         try:
             # 创建异步任务
             process_task = asyncio.create_task(self.process_sample(question, answer, choice, format))

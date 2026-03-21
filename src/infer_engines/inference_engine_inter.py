@@ -257,10 +257,14 @@ class AsyncInteractionInference:
         print(f"Interaction inference finished in {elapsed/60:.2f} min")
 
         # Save JSONL results: one scenario per line（output_path 为目录时与 AsyncInference 命名一致）
-        self.output_path = _resolve_interaction_output_jsonl(self.args)
-        out_dir = os.path.dirname(self.output_path) or "."
-        os.makedirs(out_dir, exist_ok=True)
-        with open(self.output_path, "w", encoding="utf-8") as f:
+        output_file = os.path.join(
+                    self.args.output_path,
+                    f"{self.args.dataset_name}_{self.args.llm_name}_output.json",
+                )
+        if not os.path.exists(self.args.output_path):
+            os.makedirs(self.args.output_path)
+            
+        with open(output_file, "w", encoding="utf-8") as f:
             for r in results:
                 if r is not None:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
