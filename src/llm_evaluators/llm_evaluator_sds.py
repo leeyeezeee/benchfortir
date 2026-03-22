@@ -8,7 +8,7 @@ from typing import List, Tuple, Dict, Any, Optional
 from openai import OpenAI, AsyncOpenAI
 from tqdm.asyncio import tqdm as async_tqdm
 
-from .math_equivalence import is_equiv
+from ..math_equivalence import is_equiv
 
 
 EVALUATION_PROMPT = """Given a Question and its Golden Answer, verify whether the Predicted Answer is correct. The prediction is correct if it fully aligns with the meaning and key information of the Golden Answer.
