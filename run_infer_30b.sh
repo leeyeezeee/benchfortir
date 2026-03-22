@@ -6,13 +6,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # infer.py 只接受配置文件名（stem），对应 src/config/<llm_config|dataset_config|tool_config>/
-LLM_CONFIG="${LLM_CONFIG:-Qwen3_30b}"
+LLM_CONFIG="${LLM_CONFIG:-Qwen3_32b}"
 TOOL_CONFIG="${TOOL_CONFIG:-example}"
 # 空格分隔的数据集 yaml stem；覆盖示例: DATASET_NAMES="expodesign math500" ./run_infer_30b.sh
 : "${DATASET_NAMES:=interaction expodesign math500 gsm8k500 omini500 hotpotqa}"
 : "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa simpleqa}"
-OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_30b}"
-OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_30b}"
+OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_32b}"
+OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_32b}"
 
 export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"
 mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL" logs
