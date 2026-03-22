@@ -198,7 +198,7 @@ class AsyncInteractionInference:
         return await processor.run()
 
     async def run(self) -> None:
-        """Run interaction inference for all scenarios and save traces to JSONL."""
+        """Run interaction inference for all scenarios and save traces as a JSON array."""
         scenarios = self.data_loader.load_data()
         total = len(scenarios)
         print(f"Total interaction scenarios: {total}")
@@ -230,20 +230,19 @@ class AsyncInteractionInference:
         elapsed = time.time() - start_time
         print(f"Interaction inference finished in {elapsed/60:.2f} min")
 
-        # Save JSONL results: one scenario per line（output_path 为目录时与 AsyncInference 命名一致）
+        # Save as a single JSON array (same convention as AsyncInference) for evaluate.py json.load
         output_file = os.path.join(
-                    self.args.output_path,
-                    f"{self.args.dataset_name}_output.json",
-                )
+            self.args.output_path,
+            f"{self.args.dataset_name}_output.json",
+        )
         if not os.path.exists(self.args.output_path):
             os.makedirs(self.args.output_path)
-            
-        with open(output_file, "w", encoding="utf-8") as f:
-            for r in results:
-                if r is not None:
-                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-        print(f"Saved interaction traces to {self.output_path}")
+        to_save = [r for r in results if r is not None]
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(to_save, f, ensure_ascii=False, indent=4)
+
+        print(f"Saved interaction traces to {output_file}")
 
 
 __all__ = ["AsyncInteractionInference"]
