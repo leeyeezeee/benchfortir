@@ -218,7 +218,6 @@ class SampleProcessorInter:
                 {
                     "role": "assistant",
                     "content": assistant_msg.get("content", ""),
-                    "tool_calls": assistant_msg.get("tool_calls", []),
                     "tool_trace": agent_tool_trace,
                     "turn": turn_idx,
                 }

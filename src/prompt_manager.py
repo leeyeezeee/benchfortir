@@ -48,7 +48,7 @@ READ_TOOL_PROTOCOL_ZH = """
 # Expodesign：最终 JSON schema（不包含工具调用说明）
 EXPO_DESIGN_JSON_SCHEMA = """
 Final answer format: Inside <answer>...</answer> you MUST output ONLY a valid JSON object with exactly this schema (no runnable_code field and no extra keys):
-
+<answer>
 {
   "research_question": "string",
   "hypotheses": ["string", "string"],
@@ -76,7 +76,7 @@ Final answer format: Inside <answer>...</answer> you MUST output ONLY a valid JS
     "next_steps": ["string", "string"]
   }
 }
-
+</answer>
 Do NOT output any text outside of <answer>...</answer> except tool tags and their contents. The JSON inside <answer> must be strictly valid.
 """.strip()
 
