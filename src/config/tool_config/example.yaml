@@ -19,8 +19,8 @@ local_search_url: null       # 本地检索服务地址，如 host:port
 compatible_search: false     # true 时按 dataset_name 自动选 local（2wiki/bamboogle/musique/hotpotqa）或 web
 
 # Bing / 网页搜索
-bing_api_key: "BSAhU92itmar-AppEG7FkRS2SYVlp_q"
-bing_zone: serp_api1
+bing_api_key: "1fe0c252-f2e3-40b2-8e9b-096e74e60465"
+bing_zone: serp_api2
 search_max_results: 10
 search_result_length: 1000
 bing_requests_per_second: 1.0
