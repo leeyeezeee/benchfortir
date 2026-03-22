@@ -57,32 +57,6 @@ def _resolve_customer_credentials(args: Any) -> Tuple[str, str]:
     return api_key, base_url
 
 
-def _resolve_interaction_output_jsonl(args: Any) -> str:
-    """
-    与 AsyncInference.run 一致：args.output_path 表示输出目录时，写入
-    ``{output_path}/{dataset_name}_{llm_name}_output.jsonl``（llm_name 缺省用 default_model）。
-
-    若用户显式传入以 ``.jsonl`` 结尾的文件路径（且该路径不是已存在的目录），则直接作为结果文件路径。
-    """
-    raw = getattr(args, "output_path", None) or "results"
-    norm = os.path.normpath(
-        raw if os.path.isabs(raw) else os.path.join(os.getcwd(), raw)
-    )
-
-    if os.path.isdir(norm):
-        out_dir = norm
-    elif str(raw).endswith(".jsonl") or norm.endswith(".jsonl"):
-        return norm
-    else:
-        out_dir = norm
-
-    llm = getattr(args, "llm_name", None) or getattr(args, "default_model", "model")
-    safe_llm = str(llm).replace("\\", "_").replace("/", "_")
-    ds = getattr(args, "dataset_name", "interaction")
-    fname = f"{ds}_{safe_llm}_output.jsonl"
-    return os.path.join(out_dir, fname)
-
-
 class AsyncInteractionInference:
     """
     Interaction (Task1) inference engine.
