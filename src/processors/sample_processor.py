@@ -184,15 +184,6 @@ class SampleProcessor:
     async def run(self):
         """Process one QA pair."""
         self.sample_start_time = time.time()
-
-        if getattr(self.args, "function_calling", False):
-            await self.run_with_function_calling()
-            if "output" not in self.sample_stat:
-                self.sample_stat["output"] = ""
-            self.sample_stat["prediction"] = extract_answer(self.sample_stat["output"])
-            self.total_time = time.time() - self.sample_start_time
-            return
-
         self.process_input()
         while True:
             output = await self.call_llm()

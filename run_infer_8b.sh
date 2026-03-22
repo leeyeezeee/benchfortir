@@ -8,8 +8,8 @@ cd "$(dirname "$0")"
 # infer.py 只接受配置文件名（stem），对应 src/config/<llm_config|dataset_config|tool_config>/
 LLM_CONFIG="${LLM_CONFIG:-Qwen3_8B}"
 TOOL_CONFIG="${TOOL_CONFIG:-example}"
-: "${DATASET_NAMES:=expodesign math500 gsm8k500 omini500 hotpotqa interaction}"
-: "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa simpleqa}"
+: "${DATASET_NAMES:=squadv2}"
+: "${DATASET_NAMES_NOTOOL:=squadv2}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_8b}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_8b}"
 
