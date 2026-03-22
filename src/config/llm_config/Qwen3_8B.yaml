@@ -12,7 +12,7 @@ top_k: 20
 min_p: 0.0
 repetition_penalty: 1.1
 include_stop_str_in_output: True
-max_concurrent_requests: 50          # 对应 infer 的 --max_concurrent_requests
+max_concurrent_requests: 30          # 对应 infer 的 --max_concurrent_requests
 
 use_tool: true
 # ===== vLLM serve configuration =====
