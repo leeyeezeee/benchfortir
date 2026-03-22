@@ -6,4 +6,4 @@ dataset_name: squadv2
 data_path: data
 output_path: results
 prompt_type: code_search
-sample_timeout: 180
+sample_timeout: 600
