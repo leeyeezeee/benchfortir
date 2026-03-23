@@ -23,23 +23,15 @@ TOOL_CONFIG="${TOOL_CONFIG:-example}"
 : "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa simpleqa}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/gpt4o}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/gpt4o}"
-
-OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}"
 MODEL_PATH="${MODEL_PATH:-/root/autodl-tmp/models/Qwen3-32B}"
 
-if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-  echo "ERROR: set OPENAI_API_KEY (e.g. export OPENAI_API_KEY=sk-...)" >&2
-  exit 1
-fi
 
 mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL"
 
 ENDPOINTS=("$OPENAI_BASE_URL")
 
 echo "[run_infer_gpt4o] LLM_CONFIG=$LLM_CONFIG"
-echo "[run_infer_gpt4o] OPENAI_BASE_URL=$OPENAI_BASE_URL"
 echo "[run_infer_gpt4o] MODEL_PATH=$MODEL_PATH"
-echo "[run_infer_gpt4o] DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4o}"
 echo "[run_infer_gpt4o] DATASET_NAMES=$DATASET_NAMES"
 echo "[run_infer_gpt4o] Output(use_tool=true)  -> $OUTPUT_DIR_TOOL"
 echo "[run_infer_gpt4o] Output(use_tool=false) -> $OUTPUT_DIR_NOTOOL"
@@ -52,10 +44,7 @@ for name in $DATASET_NAMES; do
     --tool_config "$TOOL_CONFIG" \
     --use_tool true \
     --output_path "$OUTPUT_DIR_TOOL" \
-    --endpoints "${ENDPOINTS[@]}" \
-    --api_keys "$OPENAI_API_KEY" \
     --model_path "$MODEL_PATH" \
-    --default_model "${DEFAULT_MODEL:-gpt-4o}"
 done
 
 for name in $DATASET_NAMES_NOTOOL; do
@@ -66,9 +55,6 @@ for name in $DATASET_NAMES_NOTOOL; do
     --tool_config "$TOOL_CONFIG" \
     --use_tool false \
     --output_path "$OUTPUT_DIR_NOTOOL" \
-    --endpoints "${ENDPOINTS[@]}" \
-    --api_keys "$OPENAI_API_KEY" \
     --model_path "$MODEL_PATH" \
-    --default_model "${DEFAULT_MODEL:-gpt-4o}" \
     2>/dev/null
 done
