@@ -4,6 +4,7 @@ sys.path.append(os.getcwd())
 
 import asyncio
 from typing import List, Dict, Any, Optional
+from types import SimpleNamespace
 
 from openai import AsyncOpenAI
 
@@ -61,6 +62,35 @@ class VLLMClientPool:
         }
         client = await self.get_client_for_session(session_id)
         max_attempts = 4
+
+        def _should_fallback_to_chat(e: Exception) -> bool:
+            # Some remote providers don't support the /completions endpoint for chat models.
+            # Typical messages include "OperationNotSupported" or "completion operation does not work with the specified model".
+            msg = str(e)
+            if "OperationNotSupported" in msg:
+                return True
+            if "completion operation" in msg and "does not work" in msg:
+                return True
+            if "does not work with the specified model" in msg and "completion" in msg:
+                return True
+            return False
+
+        async def _generate_via_chat_fallback() -> Any:
+            # Convert completion-style prompt into a chat message.
+            messages = [{"role": "user", "content": prompt}]
+            stop = params.get("stop", ["</python>", "</search>", "</answer>"])
+            response = await client.chat.completions.create(
+                model=params.get("model", self.default_model),
+                messages=messages,
+                temperature=params.get("temperature", 0.7),
+                top_p=params.get("top_p", 0.7),
+                max_tokens=params.get("max_tokens", 2048),
+                stop=stop,
+            )
+            content = (response.choices[0].message.content or "")
+            # SampleProcessor expects response.choices[0].text (completion-style).
+            return SimpleNamespace(choices=[SimpleNamespace(text=content)])
+
         for attempt in range(max_attempts): 
             try:
                 response = await client.completions.create(
@@ -78,6 +108,11 @@ class VLLMClientPool:
                 return response
             except Exception as e:
                 print(f"LLM request fails: {e}")
+                if _should_fallback_to_chat(e):
+                    try:
+                        return await _generate_via_chat_fallback()
+                    except Exception as e2:
+                        print(f"Chat fallback also failed: {e2}")
                 if attempt == max_attempts - 1: 
                     return await self._retry_with_other_client(prompt, params, session_id)
         return None
@@ -126,6 +161,17 @@ class VLLMClientPool:
         """Retry using other clients"""
         original_client_idx = self.session_to_client.get(session_id, self.current_client_idx)
         tried_clients = set([original_client_idx])
+
+        def _should_fallback_to_chat(e: Exception) -> bool:
+            msg = str(e)
+            if "OperationNotSupported" in msg:
+                return True
+            if "completion operation" in msg and "does not work" in msg:
+                return True
+            if "does not work with the specified model" in msg and "completion" in msg:
+                return True
+            return False
+
         while len(tried_clients) < len(self.clients):
             async with self.lock:
                 next_idx = (original_client_idx + 1) % len(self.clients)
@@ -151,5 +197,21 @@ class VLLMClientPool:
                 return response
             except Exception as e:
                 print(f"Client Retry failed: {str(e)}")
+                if _should_fallback_to_chat(e):
+                    try:
+                        messages = [{"role": "user", "content": prompt}]
+                        stop = params.get("stop", ["</python>", "</search>", "</answer>"])
+                        response = await client.chat.completions.create(
+                            model=params.get("model", self.default_model),
+                            messages=messages,
+                            temperature=params.get("temperature", 0.7),
+                            top_p=params.get("top_p", 0.7),
+                            max_tokens=params.get("max_tokens", 2048),
+                            stop=stop,
+                        )
+                        content = (response.choices[0].message.content or "")
+                        return SimpleNamespace(choices=[SimpleNamespace(text=content)])
+                    except Exception as e2:
+                        print(f"Chat fallback retry also failed: {e2}")
         print("All vllm clients fails, return None")
         return None 
