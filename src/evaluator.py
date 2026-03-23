@@ -403,7 +403,10 @@ class Evaluator:
         # Fallback: extract final answer from output if prediction is missing
         if (not prediction) and output:
             try:
-                prediction = extract_answer(output)
+                prediction = extract_answer(
+                    output,
+                    prompt_type="expodesign" if self.task_type == "expodesign" else None,
+                )
             except Exception:
                 # last-resort heuristic
                 prediction = "\n".join(output.replace("\n\n", "\n").strip().split("\n")[-5:])

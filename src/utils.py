@@ -1,9 +1,68 @@
+import json
 import re
 import sys
 import os
 from copy import deepcopy
+from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.append(os.getcwd())
+
+# Expodesign experiment-card schema (top-level keys in prompt_manager.EXPO_DESIGN_JSON_SCHEMA)
+EXPO_SCHEMA_TOP_KEYS = frozenset(
+    {
+        "research_question",
+        "hypotheses",
+        "dataset_choice",
+        "metrics",
+        "baselines",
+        "procedure",
+        "results_table",
+        "short_analysis",
+        "limitations_next_steps",
+    }
+)
+
+
+def _looks_like_expo_card(obj: Any) -> bool:
+    """True if parsed JSON dict overlaps enough with expodesign schema."""
+    if not isinstance(obj, dict):
+        return False
+    keys = set(obj.keys())
+    if "research_question" in keys:
+        return True
+    return len(keys & EXPO_SCHEMA_TOP_KEYS) >= 3
+
+
+def _extract_last_json_object_for_expodesign(text: str) -> str:
+    """
+    From full model output, find JSON objects via JSONDecoder.raw_decode at each '{'.
+    Prefer the last object that looks like an expodesign card; else use the last dict object.
+    Returns canonical JSON string or "" if none.
+    """
+    if not text or "{" not in text:
+        return ""
+    decoder = json.JSONDecoder()
+    candidates: List[Tuple[int, int, Any]] = []
+    for i, ch in enumerate(text):
+        if ch != "{":
+            continue
+        try:
+            obj, end = decoder.raw_decode(text[i:])
+            candidates.append((i, i + end, obj))
+        except json.JSONDecodeError:
+            continue
+    if not candidates:
+        return ""
+
+    # Prefer last object that matches expodesign schema (scan from end)
+    for _start, _end, obj in reversed(candidates):
+        if isinstance(obj, dict) and _looks_like_expo_card(obj):
+            return json.dumps(obj, ensure_ascii=False)
+
+    _s, _e, last_obj = candidates[-1]
+    if isinstance(last_obj, dict):
+        return json.dumps(last_obj, ensure_ascii=False)
+    return ""
 
 
 def remove_boxed(s):
@@ -50,7 +109,7 @@ def last_boxed_only_string(string) -> str:
     return retval
 
 
-def extract_answer(full_text: str, prompt: str = "") -> str:
+def extract_answer(full_text: str, prompt: str = "", prompt_type: Optional[str] = None) -> str:
     if prompt:
         text = full_text[len(prompt) :]
     else:
@@ -65,6 +124,12 @@ def extract_answer(full_text: str, prompt: str = "") -> str:
             temp_answer = None
     else:
         temp_answer = None
+
+    # Expodesign: no <answer> — try last JSON object (schema-like or last dict)
+    if temp_answer is None and prompt_type == "expodesign":
+        fallback = _extract_last_json_object_for_expodesign(text)
+        if fallback:
+            return fallback
 
     if temp_answer:
         boxed_answer = temp_answer.strip()

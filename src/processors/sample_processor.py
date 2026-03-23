@@ -206,7 +206,10 @@ class SampleProcessor:
 
         if "output" not in self.sample_stat:
             self.sample_stat["output"] = ""
-        self.sample_stat["prediction"] = extract_answer(self.sample_stat["output"])
+        self.sample_stat["prediction"] = extract_answer(
+            self.sample_stat["output"],
+            prompt_type=getattr(self.args, "prompt_type", None),
+        )
         self.total_time = time.time() - self.sample_start_time
 
     def log_timing(self):
@@ -264,5 +267,8 @@ class SampleProcessorCompletion(SampleProcessor):
                     self.call_read_max_limit()
             else:
                 break
-        self.sample_stat["prediction"] = extract_answer(self.sample_stat["output"])
+        self.sample_stat["prediction"] = extract_answer(
+            self.sample_stat["output"],
+            prompt_type=getattr(self.args, "prompt_type", None),
+        )
         self.total_time = time.time() - self.sample_start_time
