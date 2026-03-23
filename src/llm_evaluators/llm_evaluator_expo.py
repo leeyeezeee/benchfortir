@@ -136,7 +136,7 @@ class LLMEvaluatorExpo:
         overall_score_threshold: float = 3.0,
     ):
         if api_base_url is None:
-            api_base_url = "http://localhost:8000/v1"
+            api_base_url = "https://api.moonshot.cn/v1"
         if model_name is None:
             model_name = "<your_model_name>"
 
