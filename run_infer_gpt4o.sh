@@ -25,7 +25,7 @@ OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/gpt4o}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/gpt4o}"
 
 OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}"
-MODEL_PATH="${MODEL_PATH:-Qwen/Qwen2.5-7B-Instruct}"
+MODEL_PATH="${MODEL_PATH:-/root/autodl-tmp/models/Qwen3-32B}"
 
 if [[ -z "${OPENAI_API_KEY:-}" ]]; then
   echo "ERROR: set OPENAI_API_KEY (e.g. export OPENAI_API_KEY=sk-...)" >&2

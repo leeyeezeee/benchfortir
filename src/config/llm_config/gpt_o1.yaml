@@ -19,4 +19,4 @@ vllm:
   remote: true
   endpoints:
     - https://api.openai.com/v1
-  api_keys: []
+  api_keys: ["sk-dQmyOZSnrirkilDB451cEe3671Fe425dB7C4BcB8DdE4C7Fb"]
