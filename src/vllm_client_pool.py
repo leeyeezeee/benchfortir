@@ -62,57 +62,46 @@ class VLLMClientPool:
         }
         client = await self.get_client_for_session(session_id)
         max_attempts = 4
+        model_name = params.get("model", self.default_model) or self.default_model
+        model_lower = str(model_name).lower()
+        # If the model is a chat-style model, use chat.completions instead of completions.
+        # User requirement: default_model contains gpt -> chat branch.
+        # Note: in practice o1* models also behave like chat models, so we include them to avoid known errors.
+        use_chat = ("gpt" in model_lower) or ("o1" in model_lower)
 
-        def _should_fallback_to_chat(e: Exception) -> bool:
-            # Some remote providers don't support the /completions endpoint for chat models.
-            # Typical messages include "OperationNotSupported" or "completion operation does not work with the specified model".
-            msg = str(e)
-            if "OperationNotSupported" in msg:
-                return True
-            if "completion operation" in msg and "does not work" in msg:
-                return True
-            if "does not work with the specified model" in msg and "completion" in msg:
-                return True
-            return False
-
-        async def _generate_via_chat_fallback() -> Any:
-            # Convert completion-style prompt into a chat message.
-            messages = [{"role": "user", "content": prompt}]
-            stop = params.get("stop", ["</python>", "</search>", "</answer>"])
-            response = await client.chat.completions.create(
-                model=params.get("model", self.default_model),
-                messages=messages,
-                temperature=params.get("temperature", 0.7),
-                top_p=params.get("top_p", 0.7),
-                max_tokens=params.get("max_tokens", 2048),
-                stop=stop,
-            )
-            content = (response.choices[0].message.content or "")
-            # SampleProcessor expects response.choices[0].text (completion-style).
-            return SimpleNamespace(choices=[SimpleNamespace(text=content)])
+        stop = params.get("stop", ["</python>", "</search>", "</answer>"])
 
         for attempt in range(max_attempts): 
             try:
-                response = await client.completions.create(
-                    model=params.get("model", self.default_model),
-                    prompt=prompt,
-                    temperature=params.get("temperature", 0.7),
-                    top_p=params.get("top_p", 0.7),
-                    max_tokens=params.get("max_tokens", 8192),
-                    stop=params.get("stop", ["</python>", "</search>", "</answer>"]),
-                    extra_body={
-                        "repetition_penalty": params.get("repetition_penalty", 1.05),
-                        "include_stop_str_in_output": params.get("include_stop_str_in_output", True),
-                    }
-                )
-                return response
+                if use_chat:
+                    messages = [{"role": "user", "content": prompt}]
+                    response = await client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=params.get("temperature", 0.7),
+                        top_p=params.get("top_p", 0.7),
+                        max_tokens=params.get("max_tokens", 2048),
+                        stop=stop,
+                    )
+                    content = (response.choices[0].message.content or "")
+                    # SampleProcessor expects response.choices[0].text (completion-style).
+                    return SimpleNamespace(choices=[SimpleNamespace(text=content)])
+                else:
+                    response = await client.completions.create(
+                        model=model_name,
+                        prompt=prompt,
+                        temperature=params.get("temperature", 0.7),
+                        top_p=params.get("top_p", 0.7),
+                        max_tokens=params.get("max_tokens", 8192),
+                        stop=stop,
+                        extra_body={
+                            "repetition_penalty": params.get("repetition_penalty", 1.05),
+                            "include_stop_str_in_output": params.get("include_stop_str_in_output", True),
+                        }
+                    )
+                    return response
             except Exception as e:
                 print(f"LLM request fails: {e}")
-                if _should_fallback_to_chat(e):
-                    try:
-                        return await _generate_via_chat_fallback()
-                    except Exception as e2:
-                        print(f"Chat fallback also failed: {e2}")
                 if attempt == max_attempts - 1: 
                     return await self._retry_with_other_client(prompt, params, session_id)
         return None
@@ -161,16 +150,10 @@ class VLLMClientPool:
         """Retry using other clients"""
         original_client_idx = self.session_to_client.get(session_id, self.current_client_idx)
         tried_clients = set([original_client_idx])
-
-        def _should_fallback_to_chat(e: Exception) -> bool:
-            msg = str(e)
-            if "OperationNotSupported" in msg:
-                return True
-            if "completion operation" in msg and "does not work" in msg:
-                return True
-            if "does not work with the specified model" in msg and "completion" in msg:
-                return True
-            return False
+        model_name = params.get("model", self.default_model) or self.default_model
+        model_lower = str(model_name).lower()
+        use_chat = ("gpt" in model_lower) or ("o1" in model_lower)
+        stop = params.get("stop", ["</python>", "</search>", "</answer>"])
 
         while len(tried_clients) < len(self.clients):
             async with self.lock:
@@ -182,36 +165,33 @@ class VLLMClientPool:
                     self.session_to_client[session_id] = next_idx
             client = self.clients[next_idx]
             try:
-                response = await client.completions.create(
-                    model=params.get("model", self.default_model),
-                    prompt=prompt,
-                    temperature=params.get("temperature", 0.7),
-                    top_p=params.get("top_p", 0.7),
-                    max_tokens=params.get("max_tokens", 8192),
-                    stop=params.get("stop", ["</python>", "</search>", "</answer>"]),
-                    extra_body={
-                        "repetition_penalty": params.get("repetition_penalty", 1.05),
-                        "include_stop_str_in_output": params.get("include_stop_str_in_output", True),
-                    }
-                )
-                return response
+                if use_chat:
+                    messages = [{"role": "user", "content": prompt}]
+                    response = await client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=params.get("temperature", 0.7),
+                        top_p=params.get("top_p", 0.7),
+                        max_tokens=params.get("max_tokens", 2048),
+                        stop=stop,
+                    )
+                    content = (response.choices[0].message.content or "")
+                    return SimpleNamespace(choices=[SimpleNamespace(text=content)])
+                else:
+                    response = await client.completions.create(
+                        model=model_name,
+                        prompt=prompt,
+                        temperature=params.get("temperature", 0.7),
+                        top_p=params.get("top_p", 0.7),
+                        max_tokens=params.get("max_tokens", 8192),
+                        stop=stop,
+                        extra_body={
+                            "repetition_penalty": params.get("repetition_penalty", 1.05),
+                            "include_stop_str_in_output": params.get("include_stop_str_in_output", True),
+                        }
+                    )
+                    return response
             except Exception as e:
                 print(f"Client Retry failed: {str(e)}")
-                if _should_fallback_to_chat(e):
-                    try:
-                        messages = [{"role": "user", "content": prompt}]
-                        stop = params.get("stop", ["</python>", "</search>", "</answer>"])
-                        response = await client.chat.completions.create(
-                            model=params.get("model", self.default_model),
-                            messages=messages,
-                            temperature=params.get("temperature", 0.7),
-                            top_p=params.get("top_p", 0.7),
-                            max_tokens=params.get("max_tokens", 2048),
-                            stop=stop,
-                        )
-                        content = (response.choices[0].message.content or "")
-                        return SimpleNamespace(choices=[SimpleNamespace(text=content)])
-                    except Exception as e2:
-                        print(f"Chat fallback retry also failed: {e2}")
         print("All vllm clients fails, return None")
         return None 
