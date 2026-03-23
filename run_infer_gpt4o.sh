@@ -17,7 +17,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-LLM_CONFIG="${LLM_CONFIG:-gpt4o}"
+LLM_CONFIG="${LLM_CONFIG:-gpt_4o}"
 TOOL_CONFIG="${TOOL_CONFIG:-example}"
 : "${DATASET_NAMES:=interaction expodesign math500 gsm8k500 omini500 hotpotqa simpleqa}"
 : "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa simpleqa}"
