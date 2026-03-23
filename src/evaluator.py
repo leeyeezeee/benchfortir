@@ -646,6 +646,27 @@ class Evaluator:
         # token_count 暂时留 None，除非你在 interaction 推理时做了重token统计
         metrics["token_count"] = None
 
+        # Optional: LLM-as-judge for interaction
+        # Note: current pipeline uses customer_satisfied/customer_score for some metrics,
+        # but we also store judge "overall" into overall_score for reporting.
+        if self.use_llm and self.llm_evaluator:
+            semaphore = asyncio.Semaphore(self.concurrent_limit)
+            try:
+                is_pass, llm_reason_answer = await self.llm_evaluator.evaluate(item, semaphore)
+                metrics["interaction_llm_equal"] = int(is_pass)
+                metrics["interaction_llm_response"] = llm_reason_answer
+                try:
+                    judge_json = json.loads(llm_reason_answer)
+                    overall = judge_json.get("overall")
+                    if isinstance(overall, (int, float)):
+                        metrics["overall_score"] = float(overall)
+                    else:
+                        metrics["overall_score"] = None
+                except Exception:
+                    metrics["overall_score"] = None
+            except Exception:
+                metrics["overall_score"] = None
+
         # 为了后续 calculate_overall_metrics 里的 tool_efficiency 计算，
         # 可以把 customer_score 作为“score_for_efficiency”的基础分数。
         metrics["score_for_efficiency"] = float(customer_score)
@@ -739,12 +760,14 @@ class Evaluator:
                 eff_terms.append(float(score) / float(tc))
         tool_efficiency = _safe_mean(eff_terms)
 
-        # Interaction: aggregate simulated-customer signals (do not override accuracy)
+        # Interaction: aggregate simulated-customer signals and optional LLM-judge overall score
         avg_customer_score: Optional[float] = None
         customer_satisfaction_rate: Optional[float] = None
+        avg_interaction_overall_score: Optional[float] = None
         if self.task_type == "interaction":
             sat_vals: List[float] = []
             score_vals: List[float] = []
+            overall_vals: List[float] = []
             for item in data:
                 m = item.get("metrics", {}) or {}
                 sat = m.get("customer_satisfied")
@@ -760,10 +783,15 @@ class Evaluator:
                     sc = item.get("customer_score")
                 if isinstance(sc, (int, float)):
                     score_vals.append(float(sc))
+                o = m.get("overall_score")
+                if isinstance(o, (int, float)):
+                    overall_vals.append(float(o))
             if sat_vals:
                 customer_satisfaction_rate = _safe_mean(sat_vals)
             if score_vals:
                 avg_customer_score = _safe_mean(score_vals)
+            if overall_vals:
+                avg_interaction_overall_score = _safe_mean(overall_vals)
 
         # Expodesign: aggregate LLM judge scores (written to *_metrics_overall.json)
         avg_expo_overall_score: Optional[float] = None
@@ -813,6 +841,7 @@ class Evaluator:
             # Interaction-only (written to *_metrics_overall.json)
             "avg_customer_score": avg_customer_score,
             "customer_satisfaction_rate": customer_satisfaction_rate,
+            "overall_score": avg_interaction_overall_score,
             # Expodesign-only: mean judge overall_score and per-dimension means
             "avg_expo_overall_score": avg_expo_overall_score,
             "avg_expo_scores": avg_expo_scores,
