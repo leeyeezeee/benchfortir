@@ -587,20 +587,27 @@ class Evaluator:
             return metrics
 
         # ------- 工具调用统计 -------
-        # 仍然保留 python/search 的计数（如果 agent 侧可能用到）
-        python_calls = count_valid_tags(output or "", "python")
-        search_calls = count_valid_tags(output or "", "search")
+        # interaction 任务以 dialogue[*].tool_trace 为准统计工具调用次数
+        trace_tool_total = 0
+        trace_counts: Dict[str, int] = {}
+        for m in dialogue:
+            if m.get("role") != "assistant":
+                continue
+            for t in (m.get("tool_trace") or []):
+                trace_tool_total += 1
+                name = (t.get("tool_name") or "").strip()
+                if name:
+                    trace_counts[name] = trace_counts.get(name, 0) + 1
 
-        # interaction 专用工具：product_search / inventory_check / policy_search / order_lookup / pricing_calc
-        product_search_calls = count_valid_tags(output or "", "product_search")
-        inventory_check_calls = count_valid_tags(output or "", "inventory_check")
-        policy_search_calls = count_valid_tags(output or "", "policy_search")
-        order_lookup_calls = count_valid_tags(output or "", "order_lookup")
-        pricing_calc_calls = count_valid_tags(output or "", "pricing_calc")
-
-        # 所有工具结果都包在 <result>...</result> 中时，可以用 result 次数作为总工具调用次数
-        result_calls = count_valid_tags(output or "", "result")
-        tool_counts = result_calls
+        # python/search 与 interaction 专用工具都按 tool_trace 的 tool_name 聚合
+        python_calls = trace_counts.get("python", 0)
+        search_calls = trace_counts.get("search", 0)
+        product_search_calls = trace_counts.get("product_search", 0)
+        inventory_check_calls = trace_counts.get("inventory_check", 0)
+        policy_search_calls = trace_counts.get("policy_search", 0)
+        order_lookup_calls = trace_counts.get("order_lookup", 0)
+        pricing_calc_calls = trace_counts.get("pricing_calc", 0)
+        tool_counts = trace_tool_total
 
         metrics.update(
             {
@@ -673,7 +680,9 @@ class Evaluator:
         self.save_results(updated_data)
         return self.overall_metrics
 
-    def calculate_overall_metrics(self, data: List[Dict[str, Any]]) -> Dict[str, Union[float, str, int, None]]:
+    def calculate_overall_metrics(
+        self, data: List[Dict[str, Any]]
+    ) -> Dict[str, Union[float, str, int, None, Dict[str, float]]]:
         """Aggregate per-sample metrics into overall metrics."""
         num_valid_answer = sum(bool(item.get("metrics", {}).get("is_valid_answer", False)) for item in data)
 
@@ -727,7 +736,54 @@ class Evaluator:
                 eff_terms.append(float(score) / float(tc))
         tool_efficiency = _safe_mean(eff_terms)
 
-        overall_metrics: Dict[str, Union[float, str, int, None]] = {
+        # Interaction: aggregate simulated-customer signals (do not override accuracy)
+        avg_customer_score: Optional[float] = None
+        customer_satisfaction_rate: Optional[float] = None
+        if self.task_type == "interaction":
+            sat_vals: List[float] = []
+            score_vals: List[float] = []
+            for item in data:
+                m = item.get("metrics", {}) or {}
+                sat = m.get("customer_satisfied")
+                if sat is None:
+                    sat = item.get("customer_satisfied")
+                if sat is not None:
+                    try:
+                        sat_vals.append(float(sat))
+                    except (TypeError, ValueError):
+                        pass
+                sc = m.get("customer_score")
+                if sc is None:
+                    sc = item.get("customer_score")
+                if isinstance(sc, (int, float)):
+                    score_vals.append(float(sc))
+            if sat_vals:
+                customer_satisfaction_rate = _safe_mean(sat_vals)
+            if score_vals:
+                avg_customer_score = _safe_mean(score_vals)
+
+        # Expodesign: aggregate LLM judge scores (written to *_metrics_overall.json)
+        avg_expo_overall_score: Optional[float] = None
+        avg_expo_scores: Optional[Dict[str, float]] = None
+        if self.task_type == "expodesign":
+            overall_vals: List[float] = []
+            dim_lists: Dict[str, List[float]] = {}
+            for item in data:
+                m = item.get("metrics", {}) or {}
+                o = m.get("expo_overall_score")
+                if isinstance(o, (int, float)):
+                    overall_vals.append(float(o))
+                scores = m.get("expo_scores")
+                if isinstance(scores, dict):
+                    for k, v in scores.items():
+                        if isinstance(v, (int, float)):
+                            dim_lists.setdefault(str(k), []).append(float(v))
+            if overall_vals:
+                avg_expo_overall_score = _safe_mean(overall_vals)
+            if dim_lists:
+                avg_expo_scores = {k: _safe_mean(vs) for k, vs in dim_lists.items()}
+
+        overall_metrics: Dict[str, Union[float, str, int, None, Dict[str, float]]] = {
             # Legacy metrics
             "em": _safe_mean([float(x) for x in avg_em]),
             "acc": _safe_mean([float(x) for x in avg_acc]),
@@ -751,6 +807,12 @@ class Evaluator:
             "avg_time_sec": float(np.mean(times_num)) if times_num else None,
             "total_tokens": int(np.sum(tokens_num)) if tokens_num else None,
             "avg_tokens": float(np.mean(tokens_num)) if tokens_num else None,
+            # Interaction-only (written to *_metrics_overall.json)
+            "avg_customer_score": avg_customer_score,
+            "customer_satisfaction_rate": customer_satisfaction_rate,
+            # Expodesign-only: mean judge overall_score and per-dimension means
+            "avg_expo_overall_score": avg_expo_overall_score,
+            "avg_expo_scores": avg_expo_scores,
         }
         return overall_metrics
 
