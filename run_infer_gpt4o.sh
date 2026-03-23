@@ -27,9 +27,6 @@ MODEL_PATH="${MODEL_PATH:-/root/autodl-tmp/models/Qwen3-32B}"
 
 
 mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL"
-
-ENDPOINTS=("$OPENAI_BASE_URL")
-
 echo "[run_infer_gpt4o] LLM_CONFIG=$LLM_CONFIG"
 echo "[run_infer_gpt4o] MODEL_PATH=$MODEL_PATH"
 echo "[run_infer_gpt4o] DATASET_NAMES=$DATASET_NAMES"
