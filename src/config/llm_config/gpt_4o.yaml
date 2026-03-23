@@ -19,5 +19,5 @@ use_tool: true
 vllm:
   remote: true
   endpoints:
-    - https://api.openai.com/v1
+    - https://api.vveai.com/v1
   api_keys: ["sk-COapLsNYec5FshdVEf97C02eBeAf44A8A1201b2aCaCfDd5f"] # 建议在 shell 里用 --api_keys 传入，勿提交密钥
