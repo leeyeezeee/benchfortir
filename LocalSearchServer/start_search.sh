@@ -1,0 +1,1 @@
+python LocalSearchServer/app.py --docs LocalSearchServer/hotpot_fullwiki_docs.json --host 0.0.0.0 --port 6006
