@@ -4,4 +4,4 @@ use_llm: false              # 如果只用 F1/EM 指标，不需要 LLM 评判
 api_base_url: null
 model_name: null
 concurrent_limit: 50
-timeout: 1800
+timeout: 18000

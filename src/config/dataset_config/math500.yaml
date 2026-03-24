@@ -6,4 +6,4 @@ dataset_name: math
 data_path: data
 output_path: results
 prompt_type: math
-sample_timeout: 300
+sample_timeout: 1200

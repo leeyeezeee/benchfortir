@@ -143,12 +143,28 @@ class DataLoader:
                     else:
                         answers.append(ans if ans is not None else "")
         elif self.dataset_name.lower() == "squadv2":
-            # SQuAD 2.0：仅 question + answers；不使用 context / plausible_answers。
+            # SQuAD 2.0：将 question 与 context 拼接作为模型输入。
             # 不可回答：金标为 ""；可答：多 span 去重后的文本列表，与官方 max EM/F1 一致。
             with open(self.data_path, "r", encoding="utf-8") as f:
                 for line in f:
                     data = json.loads(line)
-                    questions.append(data["question"])
+                    question = (data.get("question") or "").strip()
+                    context = (data.get("context") or "").strip()
+                    title = (data.get("title") or "").strip()
+
+                    # Provide passage context explicitly for extractive QA behavior.
+                    if title:
+                        model_input = (
+                            f"Title: {title}\n"
+                            f"Context: {context}\n"
+                            f"Question: {question}"
+                        )
+                    else:
+                        model_input = (
+                            f"Context: {context}\n"
+                            f"Question: {question}"
+                        )
+                    questions.append(model_input)
                     raw_answers = data.get("answers") or []
                     if data.get("is_impossible") or not raw_answers:
                         answers.append("")

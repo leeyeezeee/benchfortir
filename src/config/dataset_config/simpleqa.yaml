@@ -5,4 +5,4 @@ dataset_name: SimpleQA
 data_path: data
 output_path: results
 prompt_type: code_search
-sample_timeout: 300
+sample_timeout: 1200

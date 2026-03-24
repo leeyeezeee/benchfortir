@@ -4,8 +4,8 @@
 llm_name: gpt_o1
 default_model: o1-mini
 
-temperature: 1.0
-max_tokens: 8192
+temperature: 0.2
+max_tokens: 4096
 top_p: 0.95
 top_k: 20
 min_p: 0.0

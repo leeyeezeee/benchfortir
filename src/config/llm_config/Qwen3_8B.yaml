@@ -5,14 +5,14 @@ llm_name: qwen3                      # 原来的 llm_nmae，注意修正拼写
 model_path: /root/autodl-tmp/models/Qwen3-8B
 default_model: Qwen3-8B              # vLLM serve 的 --served-model-name，推理时也用这个
 
-temperature: 1.0
+temperature: 0.2
 max_tokens: 4096
 top_p: 0.95
 top_k: 20
 min_p: 0.0
 repetition_penalty: 1.1
 include_stop_str_in_output: True
-max_concurrent_requests: 30          # 对应 infer 的 --max_concurrent_requests
+max_concurrent_requests: 12          # 对应 infer 的 --max_concurrent_requests
 
 use_tool: true
 # ===== vLLM serve configuration =====
