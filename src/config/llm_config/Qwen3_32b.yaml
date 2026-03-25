@@ -2,7 +2,7 @@
 ## 30B：4 卡单实例（TP=4）部署配置
 
 llm_name: qwen3
-model_path: /root/autodl-tmp/models/Qwen3-32B
+model_path: /home/lyz/models/Qwen3-32B
 default_model: Qwen3-32B
 
 temperature: 0.2

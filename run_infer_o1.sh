@@ -22,7 +22,7 @@ TOOL_CONFIG="${TOOL_CONFIG:-example}"
 : "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa simpleqa}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/gpt_o1}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/gpt_o1}"
-MODEL_PATH="${MODEL_PATH:-/root/autodl-tmp/models/Qwen3-32B}"
+MODEL_PATH="${MODEL_PATH:-/home/lyz/models/Qwen3-32B}"
 
 
 mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL"

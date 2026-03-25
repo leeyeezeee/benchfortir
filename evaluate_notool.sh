@@ -10,9 +10,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-OUT_ROOT="${OUT_ROOT:-/root/autodl-tmp/benchfortir/results/notool/qwen3_4b}"
+OUT_ROOT="${OUT_ROOT:-/home/lyz/benchfortir/results/notool/qwen3_4b}"
 # 默认与 src/config/llm_config/Qwen3_30b.yaml 的 model_path 一致；本地无该目录时请覆盖或置空跳过 token 统计
-TOKENIZER_PATH="${TOKENIZER_PATH:-/root/autodl-tmp/models/Qwen3-4B}"
+TOKENIZER_PATH="${TOKENIZER_PATH:-/home/lyz/models/Qwen3-4B}"
 TOK_ARGS=()
 if [[ -n "${TOKENIZER_PATH}" ]]; then
   TOK_ARGS=(--tokenizer_path "${TOKENIZER_PATH}")

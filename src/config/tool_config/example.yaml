@@ -1,7 +1,7 @@
 # ========== 工具配置（infer 推理时使用的全部工具参数） ==========
 
 # ----- Python 执行器 -----
-conda_path: /root/miniconda3
+conda_path: /home/lyz/miniconda3
 conda_env: tool              # Conda 安装路径，用于执行 <python> 代码块              # Conda 环境名
 python_max_concurrent: 32      # Python 执行器最大并发数
 max_python_times: 5           # 单样本最多调用 Python 工具次数
