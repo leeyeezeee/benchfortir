@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 LLM_CONFIG="${LLM_CONFIG:-Qwen3_32b}"
 TOOL_CONFIG="${TOOL_CONFIG:-example}"
 # 空格分隔的数据集 yaml stem；覆盖示例: DATASET_NAMES="expodesign math500" ./run_infer_30b.sh
-: "${DATASET_NAMES:=interaction expodesign math500 gsm8k500 omini500 hotpotqa squadv2 simpleqa}"
+: "${DATASET_NAMES:=math500 gsm8k500 omini500 hotpotqa squadv2 simpleqa}"
 : "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa squadv2 simpleqa}"
 OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_32b}"
 OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_32b}"
@@ -54,5 +54,6 @@ for name in $DATASET_NAMES_NOTOOL; do
     --use_tool false \
     --output_path "$OUTPUT_DIR_NOTOOL" \
     --endpoints "${ENDPOINTS[@]}" \
+    --max_tokens 2048 \
     2>/dev/null
 done

@@ -13,6 +13,11 @@ deploy.py
     参与本次部署的 GPU 数量（默认 4），物理编号假设为连续 0..N-1。
 
 可选环境变量：
+  VLLM_GPU_OFFSET 或 DEPLOY_GPU_OFFSET
+    物理 GPU 起始偏移（默认 0）。例如:
+      offset=1, total_gpus=4 表示本次部署使用物理 GPU [1,2,3,4]。
+
+可选环境变量：
   VLLM_BASE_PORT — 第一个实例端口（默认用 YAML 中 vllm.port，否则 8001）
 
 各 vLLM 子进程：stderr 输出到当前终端，stdout 丢弃（避免多实例混排）；不写日志文件。
@@ -67,6 +72,19 @@ def total_gpus_from_env() -> int:
     return n
 
 
+def gpu_offset_from_env() -> int:
+    raw = os.environ.get("VLLM_GPU_OFFSET") or os.environ.get("DEPLOY_GPU_OFFSET") or "0"
+    try:
+        off = int(str(raw).strip())
+    except ValueError as e:
+        raise ValueError(
+            f"VLLM_GPU_OFFSET / DEPLOY_GPU_OFFSET 必须是整数，当前为: {raw!r}"
+        ) from e
+    if off < 0:
+        raise ValueError("VLLM_GPU_OFFSET / DEPLOY_GPU_OFFSET 必须 >= 0")
+    return off
+
+
 def base_port_from_env_and_config(config: Dict[str, Any]) -> int:
     env_p = os.environ.get("VLLM_BASE_PORT")
     if env_p is not None and str(env_p).strip() != "":
@@ -75,13 +93,23 @@ def base_port_from_env_and_config(config: Dict[str, Any]) -> int:
     return int(vllm_cfg.get("port", 8001))
 
 
-def gpu_ids_for_instance(instance_index: int, gpus_per_inst: int, total_gpus: int) -> str:
-    """第 instance_index 个实例的 CUDA_VISIBLE_DEVICES，如 '0,1'。"""
-    start = instance_index * gpus_per_inst
+def gpu_ids_for_instance(
+    instance_index: int,
+    gpus_per_inst: int,
+    total_gpus: int,
+    gpu_offset: int,
+) -> str:
+    """第 instance_index 个实例的 CUDA_VISIBLE_DEVICES，如 '0,1'。
+
+    这里的 GPU 编号是“物理 GPU 编号”（考虑 gpu_offset）。
+    """
+    start = gpu_offset + instance_index * gpus_per_inst
     end = start + gpus_per_inst
-    if end > total_gpus:
+    # total_gpus 表示从 gpu_offset 开始的参与 GPU 数量
+    if end > gpu_offset + total_gpus:
         raise RuntimeError(
-            f"实例 {instance_index} 需要 GPU [{start},{end})，但机器仅有 {total_gpus} 张 GPU"
+            f"实例 {instance_index} 需要 GPU [{start},{end})，但参与池仅有 {total_gpus} 张 GPU "
+            f"(gpu_offset={gpu_offset})"
         )
     return ",".join(str(i) for i in range(start, end))
 
@@ -157,6 +185,7 @@ def deploy_vllm_multi(config_path: str) -> None:
 
     per = gpus_per_instance(config)
     total = total_gpus_from_env()
+    gpu_offset = gpu_offset_from_env()
     if per > total:
         raise ValueError(
             f"单实例需要 {per} 张 GPU（tensor_parallel_size），但环境预设总 GPU 数为 {total}，无法部署任何实例。"
@@ -178,11 +207,13 @@ def deploy_vllm_multi(config_path: str) -> None:
     procs: List[subprocess.Popen] = []
 
     for i in range(num_instances):
-        gid = gpu_ids_for_instance(i, per, total)
+        gid = gpu_ids_for_instance(i, per, total, gpu_offset)
         port = base_port + i
         env, cmd = build_vllm_command(config, gpu_ids=gid, port=port)
 
-        print(f"[deploy] 实例 {i}: CUDA_VISIBLE_DEVICES={gid} port={port}")
+        print(
+            f"[deploy] 实例 {i}: CUDA_VISIBLE_DEVICES={gid} port={port} (gpu_offset={gpu_offset})"
+        )
         print("  " + " ".join(cmd))
 
         # 仅 stderr 到终端；stdout 丢弃，避免多实例输出交错难以阅读

@@ -28,8 +28,8 @@ vllm:
   max_model_len: 32768               # --max-model-len
   gpu_memory_utilization: 0.9
   max_logprobs: 100                  # 可选，对应 --max-logprobs
-  extra_args: []                     # 可选，额外透传到 vllm serve 的参数列表
-
+  extra_args:
+  - "--dtype=half"
   # 远程模式相关（remote: true 时才用，可选）
   endpoints: []                      # 例如 ["https://api.xxx.com/v1"]
   api_keys: []                       # 与 endpoints 一一对应

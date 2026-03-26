@@ -26,7 +26,8 @@ vllm:
   max_model_len: 32768
   gpu_memory_utilization: 0.9
   max_logprobs: 100
-  extra_args: []
+  extra_args:
+  - "--dtype=half"
 
   # remote 模式可用；当前本配置默认 remote=false
   endpoints: []

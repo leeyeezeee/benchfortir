@@ -22,12 +22,13 @@ vllm:
   # 本地部署相关
   host: 0.0.0.0
   port: 8001
-  gpu_ids: "0"                       # 映射到 CUDA_VISIBLE_DEVICES
+  gpu_ids: "1"                       # 映射到 CUDA_VISIBLE_DEVICES
   tensor_parallel_size: 1
   max_model_len: 32768               # --max-model-len
   gpu_memory_utilization: 0.9
   max_logprobs: 100                  # 可选，对应 --max-logprobs
-  extra_args: []                     # 可选，额外透传到 vllm serve 的参数列表
+  extra_args:
+  - "--dtype=half"                    # 可选，额外透传到 vllm serve 的参数列表
 
   # 远程模式相关（remote: true 时才用，可选）
   endpoints: []                      # 例如 ["https://api.xxx.com/v1"]

@@ -151,6 +151,10 @@ class AsyncInference:
                 zone=self.args.bing_zone,
                 max_results=self.args.search_max_results,
                 result_length=self.args.search_result_length,
+                requests_per_second=self.args.bing_requests_per_second,
+                search_cache_file=self.args.search_cache_file,
+                max_retries=self.args.bing_max_retries,
+                retry_delay=self.args.bing_retry_delay,
             )
             tool_executor.register_tool(web_search_tool)
         return tool_executor
