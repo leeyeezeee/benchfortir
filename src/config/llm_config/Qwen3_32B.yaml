@@ -1,0 +1,34 @@
+## src/config/llm_config/Qwen3_30b.yaml
+## 30B：4 卡单实例（TP=4）部署配置
+
+llm_name: qwen3
+model_path: /home/lyz/models/Qwen3-32B
+default_model: Qwen3-32B
+
+temperature: 0.2
+max_tokens: 4096
+top_p: 0.95
+top_k: 20
+min_p: 0.0
+repetition_penalty: 1.1
+include_stop_str_in_output: True
+max_concurrent_requests: 4
+
+use_tool: true
+
+vllm:
+  remote: false
+  host: 0.0.0.0
+  port: 8001
+  # 单实例 TP：让一个 vLLM 进程使用四张卡做 tensor parallel
+  gpu_ids: "0,1,2,3"
+  tensor_parallel_size: 4
+  max_model_len: 32768
+  gpu_memory_utilization: 0.9
+  max_logprobs: 100
+  extra_args:
+  - "--dtype=half"
+
+  # remote 模式可用；当前本配置默认 remote=false
+  endpoints: []
+  api_keys: []

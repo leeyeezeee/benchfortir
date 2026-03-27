@@ -6,7 +6,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_30B.yaml}"
+LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_32B.yaml}"
 export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"
 
 echo "[start_vllm] Using config: ${LLM_CONFIG} VLLM_TOTAL_GPUS=${VLLM_TOTAL_GPUS}"

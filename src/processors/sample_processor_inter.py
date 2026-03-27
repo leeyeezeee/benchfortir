@@ -5,6 +5,7 @@ sys.path.append(os.getcwd())
 
 import asyncio
 import json
+import random
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -346,13 +347,44 @@ class SampleProcessorInter:
             },
         ]
 
-        completion = self.customer_client.chat.completions.create(
-            model=self.customer_model,
-            messages=messages,
-            temperature=self.customer_temperature,
-            max_tokens=self.customer_max_tokens,
-            response_format={"type": "json_object"},
-        )
+        retry_limit = int(getattr(self.args, "customer_retry_limit", 5))
+        backoff_base = float(getattr(self.args, "customer_retry_backoff_base", 1.0))
+        completion = None
+        last_error: Optional[Exception] = None
+        for attempt in range(retry_limit):
+            try:
+                completion = self.customer_client.chat.completions.create(
+                    model=self.customer_model,
+                    messages=messages,
+                    temperature=self.customer_temperature,
+                    max_tokens=self.customer_max_tokens,
+                    response_format={"type": "json_object"},
+                )
+                break
+            except Exception as e:
+                last_error = e
+                err_text = str(e).lower()
+                is_retryable = (
+                    "429" in err_text
+                    or "rate limit" in err_text
+                    or "engine_overloaded" in err_text
+                    or "overloaded" in err_text
+                    or "temporarily unavailable" in err_text
+                    or "timeout" in err_text
+                )
+                if (not is_retryable) or attempt == retry_limit - 1:
+                    break
+                sleep_s = backoff_base * (2 ** attempt) + random.random() * 0.3
+                time.sleep(sleep_s)
+
+        if completion is None:
+            return {
+                "message": "The service is temporarily busy. Please continue and provide concise guidance.",
+                "satisfied": False,
+                "score": 0,
+                "reason": f"customer_api_error: {last_error}",
+                "raw": {},
+            }
 
         msg = completion.choices[0].message
         content = (msg.content or "").strip()

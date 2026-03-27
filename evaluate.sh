@@ -10,9 +10,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-OUT_ROOT="${OUT_ROOT:-/home/lyz/benchfortir/results/tool/qwen3_4b}"
+OUT_ROOT="${OUT_ROOT:-/home/lyz/benchfortir/results/tool/qwen3_8b}"
 # 默认与 src/config/llm_config/Qwen3_30b.yaml 的 model_path 一致；本地无该目录时请覆盖或置空跳过 token 统计
-TOKENIZER_PATH="${TOKENIZER_PATH:-/home/lyz/models/Qwen3-4B}"
+TOKENIZER_PATH="${TOKENIZER_PATH:-/home/lyz/models/Qwen3-8B}"
 TOK_ARGS=()
 if [[ -n "${TOKENIZER_PATH}" ]]; then
   TOK_ARGS=(--tokenizer_path "${TOKENIZER_PATH}")
@@ -61,15 +61,15 @@ python evaluate.py --eval_config "$EVAL_MATH" \
   --output_path "${OUT_ROOT}/omini_output.json" \
   "${TOK_ARGS[@]}"
 
-echo "========== EXPODESIGN =========="
-python evaluate.py --eval_config "$EVAL_EXPO" \
-  --dataset_config src/config/dataset_config/expodesign.yaml \
-  --output_path "${OUT_ROOT}/expodesign_output.json" \
-  "${TOK_ARGS[@]}"
+# echo "========== EXPODESIGN =========="
+# python evaluate.py --eval_config "$EVAL_EXPO" \
+#   --dataset_config src/config/dataset_config/expodesign.yaml \
+#   --output_path "${OUT_ROOT}/expodesign_output.json" \
+#   "${TOK_ARGS[@]}"
 
-echo "========== INTERACTION =========="
-python evaluate.py --eval_config "$EVAL_INTER" \
-  --dataset_config src/config/dataset_config/interaction.yaml \
-  --output_path "${OUT_ROOT}/interaction_output.json" \
+# echo "========== INTERACTION =========="
+# python evaluate.py --eval_config "$EVAL_INTER" \
+#   --dataset_config src/config/dataset_config/interaction.yaml \
+#   --output_path "${OUT_ROOT}/interaction_output.json" \
 
 echo "All evaluation jobs finished."

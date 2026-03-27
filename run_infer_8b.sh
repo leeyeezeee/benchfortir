@@ -41,8 +41,7 @@ for name in $DATASET_NAMES; do
     --tool_config "$TOOL_CONFIG" \
     --use_tool true \
     --output_path "$OUTPUT_DIR_TOOL" \
-    --endpoints "${ENDPOINTS[@]}" \
-    2>/dev/null
+    --endpoints "${ENDPOINTS[@]}" 
 done
 
 for name in $DATASET_NAMES_NOTOOL; do
