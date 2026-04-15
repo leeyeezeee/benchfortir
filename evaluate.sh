@@ -10,9 +10,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-OUT_ROOT="${OUT_ROOT:-/home/lyz/benchfortir/results/tool/qwen3_8b}"
+OUT_ROOT="${OUT_ROOT:-/home/lyz/benchfortir/results/tool/gpt_5}"
 # 默认与 src/config/llm_config/Qwen3_30b.yaml 的 model_path 一致；本地无该目录时请覆盖或置空跳过 token 统计
-TOKENIZER_PATH="${TOKENIZER_PATH:-/home/lyz/models/Qwen3-8B}"
+TOKENIZER_PATH="${TOKENIZER_PATH:-/data/lyz/models/Qwen3-32B}"
 TOK_ARGS=()
 if [[ -n "${TOKENIZER_PATH}" ]]; then
   TOK_ARGS=(--tokenizer_path "${TOKENIZER_PATH}")
@@ -36,30 +36,30 @@ python evaluate.py --eval_config "$EVAL_QA" \
   --output_path "${OUT_ROOT}/squadv2_output.json" \
   "${TOK_ARGS[@]}"
 
-echo "--- SimpleQA ---"
-python evaluate.py --eval_config "$EVAL_QA" \
-  --dataset_config src/config/dataset_config/simpleqa.yaml \
-  --output_path "${OUT_ROOT}/SimpleQA_output.json" \
-  "${TOK_ARGS[@]}"
+# echo "--- SimpleQA ---"
+# python evaluate.py --eval_config "$EVAL_QA" \
+#   --dataset_config src/config/dataset_config/simpleqa.yaml \
+#   --output_path "${OUT_ROOT}/SimpleQA_output.json" \
+#   "${TOK_ARGS[@]}"
 
-echo "========== MATH =========="
-echo "--- math (math500) ---"
-python evaluate.py --eval_config "$EVAL_MATH" \
-  --dataset_config src/config/dataset_config/math500.yaml \
-  --output_path "${OUT_ROOT}/math_output.json" \
-  "${TOK_ARGS[@]}"
+# echo "========== MATH =========="
+# echo "--- math (math500) ---"
+# python evaluate.py --eval_config "$EVAL_MATH" \
+#   --dataset_config src/config/dataset_config/math500.yaml \
+#   --output_path "${OUT_ROOT}/math_output.json" \
+#   "${TOK_ARGS[@]}"
 
-echo "--- gsm8k (gsm8k500) ---"
-python evaluate.py --eval_config "$EVAL_MATH" \
-  --dataset_config src/config/dataset_config/gsm8k500.yaml \
-  --output_path "${OUT_ROOT}/gsm8k_output.json" \
-  "${TOK_ARGS[@]}"
+# echo "--- gsm8k (gsm8k500) ---"
+# python evaluate.py --eval_config "$EVAL_MATH" \
+#   --dataset_config src/config/dataset_config/gsm8k500.yaml \
+#   --output_path "${OUT_ROOT}/gsm8k_output.json" \
+#   "${TOK_ARGS[@]}"
 
-echo "--- omini (omini500) ---"
-python evaluate.py --eval_config "$EVAL_MATH" \
-  --dataset_config src/config/dataset_config/omini500.yaml \
-  --output_path "${OUT_ROOT}/omini_output.json" \
-  "${TOK_ARGS[@]}"
+# echo "--- omini (omini500) ---"
+# python evaluate.py --eval_config "$EVAL_MATH" \
+#   --dataset_config src/config/dataset_config/omini500.yaml \
+#   --output_path "${OUT_ROOT}/omini_output.json" \
+#   "${TOK_ARGS[@]}"
 
 # echo "========== EXPODESIGN =========="
 # python evaluate.py --eval_config "$EVAL_EXPO" \

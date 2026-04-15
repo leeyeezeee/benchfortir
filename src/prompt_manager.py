@@ -98,17 +98,17 @@ class PromptManager:
         """
         self.prompt_type = prompt_type
         self.use_tool = use_tool
-        self.prompt_template = self._append_read_tool_notice(self._get_template())
+        self.prompt_template = self._get_template()
 
-    def _append_read_tool_notice(self, prompt: str) -> str:
-        if not self.use_tool:
-            return prompt
-        if self.prompt_type == "interaction":
-            return prompt
-        if "<read>" in prompt or "read tool" in prompt.lower() or "文件读取工具" in prompt:
-            return prompt
-        notice = READ_TOOL_PROTOCOL_ZH if self.prompt_type == "code_search_cn" else READ_TOOL_PROTOCOL_EN
-        return prompt.rstrip() + "\n\n" + notice
+    # def _append_read_tool_notice(self, prompt: str) -> str:
+    #     if not self.use_tool:
+    #         return prompt
+    #     if self.prompt_type == "interaction":
+    #         return prompt
+    #     if "<read>" in prompt or "read tool" in prompt.lower() or "文件读取工具" in prompt:
+    #         return prompt
+    #     notice = READ_TOOL_PROTOCOL_ZH if self.prompt_type == "code_search_cn" else READ_TOOL_PROTOCOL_EN
+    #     return prompt.rstrip() + "\n\n" + notice
 
     def _get_template(self) -> str:
         """Get the prompt template based on prompt type."""

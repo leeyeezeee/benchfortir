@@ -1,18 +1,18 @@
 ## src/config/llm_config/Qwen3_30b.yaml
 ## 30B：4 卡单实例（TP=4）部署配置
 
-llm_name: qwen3
-model_path: /home/lyz/models/Qwen3-32B
+llm_name: qwen3_32b
+model_path: /data/lyz/models/Qwen3-32B
 default_model: Qwen3-32B
 
 temperature: 0.2
-max_tokens: 4096
+max_tokens: 2048
 top_p: 0.95
 top_k: 20
 min_p: 0.0
 repetition_penalty: 1.1
 include_stop_str_in_output: True
-max_concurrent_requests: 4
+max_concurrent_requests: 8
 
 use_tool: true
 

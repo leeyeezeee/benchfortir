@@ -147,7 +147,7 @@ class SampleProcessor:
                     sample_stat=self.sample_stat,
                 )
         else:
-            if self.args.dataset_name in ["2wiki", "bamboogle", "musique", "hotpotqa"]:
+            if self.args.dataset_name in ["2wiki", "bamboogle", "musique", "hotpotqa","squadv2"]:
                 search_result = await self.tool_executor.execute(
                     "localsearch",
                     search_query,

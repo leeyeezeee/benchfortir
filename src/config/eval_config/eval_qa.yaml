@@ -1,7 +1,9 @@
 # e:\EM\evaluation\src\config\eval_config\eval_qa.yaml
-task: qa
-use_llm: false              # 如果只用 F1/EM 指标，不需要 LLM 评判
-api_base_url: null
-model_name: null
-concurrent_limit: 50
-timeout: 18000
+
+task: qa            # 评测任务类型：math | qa
+use_llm: true        # 是否使用 LLM 做等价性评估
+api_base_url: https://api.moonshot.cn/v1    # 用 LLM 评测时的 API base URL（如 http://localhost:8001/v1）
+model_name: kimi-k2-0905-preview
+api_key: sk-IvXK1GcIhwXbaCm62ceqcsUVB1qNbB8upHnhzOOgGVgd5Txq     # 用 LLM 评测时的模型名（如 Qwen2.5-72B-Instruct）
+concurrent_limit: 50  # 最大并发评测样本数
+timeout: 18000         # 整体评测超时（秒）

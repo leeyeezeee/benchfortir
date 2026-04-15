@@ -1,12 +1,12 @@
 # src/config/llm_config/llm_for_test.yaml
 
 # ===== LLM configuration（推理时可复用）=====
-llm_name: qwen3                      # 原来的 llm_nmae，注意修正拼写
-model_path: /home/lyz/models/Qwen3-8B
+llm_name: qwen3_8b                      # 原来的 llm_nmae，注意修正拼写
+model_path: /data/lyz/models/Qwen3-8B
 default_model: Qwen3-8B              # vLLM serve 的 --served-model-name，推理时也用这个
 
-temperature: 0.2
-max_tokens: 4096
+temperature: 0.1
+max_tokens: 2048
 top_p: 0.95
 top_k: 20
 min_p: 0.0
@@ -25,7 +25,7 @@ vllm:
   # 单实例 TP：让一个 vLLM 进程使用两张卡做 tensor parallel
   gpu_ids: "0,1"                    # 映射到 CUDA_VISIBLE_DEVICES
   tensor_parallel_size: 2
-  max_model_len: 32768               # --max-model-len
+  max_model_len: 32768             # --max-model-len
   gpu_memory_utilization: 0.9
   max_logprobs: 100                  # 可选，对应 --max-logprobs
   extra_args:

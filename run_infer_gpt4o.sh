@@ -17,13 +17,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-LLM_CONFIG="${LLM_CONFIG:-gpt_4o}"
+LLM_CONFIG="${LLM_CONFIG:-gpt_5}"
 TOOL_CONFIG="${TOOL_CONFIG:-example}"
-: "${DATASET_NAMES:=interaction expodesign math500 gsm8k500 omini500 hotpotqa simpleqa}"
-: "${DATASET_NAMES_NOTOOL:=math500 gsm8k500 omini500 hotpotqa simpleqa}"
-OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/gpt4o}"
-OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/gpt4o}"
-MODEL_PATH="${MODEL_PATH:-/home/lyz/models/Qwen3-32B}"
+: "${DATASET_NAMES:=hotpotqa squadv2}"
+: "${DATASET_NAMES_NOTOOL:=}"
+OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/gpt_5}"
+OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/gpt_5}"
+MODEL_PATH="${MODEL_PATH:-/data/lyz/models/Qwen3-32B}"
 
 
 mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL"
