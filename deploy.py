@@ -3,19 +3,9 @@
 deploy.py
 
 读取 llm_config YAML：
-  - 用 vllm.tensor_parallel_size 表示「每个实例」需要的 GPU 数；
-  - 用环境变量表示本机参与部署的 GPU 总数；
-  - 可部署实例数 = 总 GPU 数 // 每实例 GPU 数；
-  - 按实例依次分配连续物理 GPU（0 起），端口从首端口递增。
-
-环境变量（二选一，优先 VLLM_TOTAL_GPUS）：
-  VLLM_TOTAL_GPUS 或 DEPLOY_TOTAL_GPUS
-    参与本次部署的 GPU 数量（默认 4），物理编号假设为连续 0..N-1。
-
-可选环境变量：
-  VLLM_GPU_OFFSET 或 DEPLOY_GPU_OFFSET
-    物理 GPU 起始偏移（默认 0）。例如:
-      offset=1, total_gpus=4 表示本次部署使用物理 GPU [1,2,3,4]。
+  - vllm.gpu_ids 指定实例与显卡绑定关系；
+  - 支持字符串（单实例）或字符串列表（多实例）；
+  - 每个实例端口从首端口递增（base_port + index）。
 
 可选环境变量：
   VLLM_BASE_PORT — 第一个实例端口（默认用 YAML 中 vllm.port，否则 8001）
@@ -23,9 +13,8 @@ deploy.py
 各 vLLM 子进程：stderr 输出到当前终端，stdout 丢弃（避免多实例混排）；不写日志文件。
 
 用法示例：
-  export VLLM_TOTAL_GPUS=4
   python deploy.py --config src/config/llm_config/Qwen3_8B.yaml
-  # 若 tensor_parallel_size=2，则部署 2 个实例：GPU 0,1 与 2,3，端口 8001、8002
+  # 若 vllm.gpu_ids: ["0,1", "2,3"]，则部署 2 个实例，端口 8001、8002
 """
 
 from __future__ import annotations
@@ -35,6 +24,7 @@ import os
 import subprocess
 import sys
 from typing import Any, Dict, List, Tuple
+from src.wandb_config import add_wandb_args, maybe_init_wandb, wandb_finish, wandb_log
 
 try:
     import yaml
@@ -59,32 +49,6 @@ def gpus_per_instance(config: Dict[str, Any]) -> int:
     return tp
 
 
-def total_gpus_from_env() -> int:
-    raw = os.environ.get("VLLM_TOTAL_GPUS") or os.environ.get("DEPLOY_TOTAL_GPUS") or "4"
-    try:
-        n = int(str(raw).strip())
-    except ValueError as e:
-        raise ValueError(
-            f"VLLM_TOTAL_GPUS / DEPLOY_TOTAL_GPUS 必须是整数，当前为: {raw!r}"
-        ) from e
-    if n < 1:
-        raise ValueError("环境变量中的 GPU 总数必须 >= 1")
-    return n
-
-
-def gpu_offset_from_env() -> int:
-    raw = os.environ.get("VLLM_GPU_OFFSET") or os.environ.get("DEPLOY_GPU_OFFSET") or "0"
-    try:
-        off = int(str(raw).strip())
-    except ValueError as e:
-        raise ValueError(
-            f"VLLM_GPU_OFFSET / DEPLOY_GPU_OFFSET 必须是整数，当前为: {raw!r}"
-        ) from e
-    if off < 0:
-        raise ValueError("VLLM_GPU_OFFSET / DEPLOY_GPU_OFFSET 必须 >= 0")
-    return off
-
-
 def base_port_from_env_and_config(config: Dict[str, Any]) -> int:
     env_p = os.environ.get("VLLM_BASE_PORT")
     if env_p is not None and str(env_p).strip() != "":
@@ -93,25 +57,54 @@ def base_port_from_env_and_config(config: Dict[str, Any]) -> int:
     return int(vllm_cfg.get("port", 8001))
 
 
-def gpu_ids_for_instance(
-    instance_index: int,
-    gpus_per_inst: int,
-    total_gpus: int,
-    gpu_offset: int,
-) -> str:
-    """第 instance_index 个实例的 CUDA_VISIBLE_DEVICES，如 '0,1'。
+def parse_gpu_groups(vllm_cfg: Dict[str, Any], gpus_per_inst: int) -> List[str]:
+    """解析并校验 vllm.gpu_ids，返回每个实例的 CUDA_VISIBLE_DEVICES。"""
+    raw = vllm_cfg.get("gpu_ids")
+    if raw is None:
+        raise ValueError("缺少 vllm.gpu_ids")
 
-    这里的 GPU 编号是“物理 GPU 编号”（考虑 gpu_offset）。
-    """
-    start = gpu_offset + instance_index * gpus_per_inst
-    end = start + gpus_per_inst
-    # total_gpus 表示从 gpu_offset 开始的参与 GPU 数量
-    if end > gpu_offset + total_gpus:
-        raise RuntimeError(
-            f"实例 {instance_index} 需要 GPU [{start},{end})，但参与池仅有 {total_gpus} 张 GPU "
-            f"(gpu_offset={gpu_offset})"
-        )
-    return ",".join(str(i) for i in range(start, end))
+    if isinstance(raw, str):
+        groups = [raw.strip()]
+    elif isinstance(raw, list):
+        groups = []
+        for i, item in enumerate(raw):
+            if not isinstance(item, str):
+                raise ValueError(
+                    f"vllm.gpu_ids[{i}] 必须是字符串，如 '0,1'；当前类型={type(item).__name__}"
+                )
+            groups.append(item.strip())
+    else:
+        raise ValueError("vllm.gpu_ids 必须是字符串或字符串列表")
+
+    if not groups or any(not g for g in groups):
+        raise ValueError("vllm.gpu_ids 不能为空；示例：'0,1' 或 ['0,1', '2,3']")
+
+    seen_cards = set()
+    for idx, group in enumerate(groups):
+        tokens = [x.strip() for x in group.split(",")]
+        if any(not t for t in tokens):
+            raise ValueError(
+                f"vllm.gpu_ids[{idx}] 格式非法：{group!r}（请使用逗号分隔，如 '0,1'）"
+            )
+        try:
+            cards = [int(x) for x in tokens]
+        except ValueError as e:
+            raise ValueError(
+                f"vllm.gpu_ids[{idx}] 包含非整数卡号：{group!r}"
+            ) from e
+        if any(c < 0 for c in cards):
+            raise ValueError(
+                f"vllm.gpu_ids[{idx}] 包含负数卡号：{group!r}"
+            )
+        if len(cards) != gpus_per_inst:
+            raise ValueError(
+                f"vllm.gpu_ids[{idx}] 包含 {len(cards)} 张卡，但 tensor_parallel_size={gpus_per_inst}"
+            )
+        for c in cards:
+            if c in seen_cards:
+                raise ValueError(f"GPU {c} 被重复分配，请检查 vllm.gpu_ids")
+            seen_cards.add(c)
+    return groups
 
 
 def build_vllm_command(
@@ -176,7 +169,6 @@ def deploy_vllm_multi(config_path: str) -> None:
         endpoints = vllm_cfg.get("endpoints") or []
         api_keys = vllm_cfg.get("api_keys") or []
         default_model = config.get("default_model") or config.get("llm_name")
-        print("检测到 vllm.remote = True，假定使用远程已部署的 LLM 服务。")
         print(f"endpoints: {endpoints}")
         print(f"api_keys: {['***' if k else '' for k in api_keys]}")
         print(f"default_model: {default_model}")
@@ -184,35 +176,19 @@ def deploy_vllm_multi(config_path: str) -> None:
         return
 
     per = gpus_per_instance(config)
-    total = total_gpus_from_env()
-    gpu_offset = gpu_offset_from_env()
-    if per > total:
-        raise ValueError(
-            f"单实例需要 {per} 张 GPU（tensor_parallel_size），但环境预设总 GPU 数为 {total}，无法部署任何实例。"
-        )
-
-    num_instances = total // per
-    remainder = total % per
+    gpu_groups = parse_gpu_groups(vllm_cfg, gpus_per_inst=per)
     base_port = base_port_from_env_and_config(config)
-
-    print(
-        f"[deploy] 每实例 GPU 数（tensor_parallel_size）: {per}；"
-        f"环境总 GPU 数: {total}；可部署实例数: {num_instances}"
-    )
-    if remainder > 0:
-        print(
-            f"[deploy] 提示: {total} 无法被 {per} 整除，剩余 {remainder} 张 GPU 未使用。"
-        )
+    print(f"[deploy] 每实例 GPU 数（tensor_parallel_size）: {per}")
+    print(f"[deploy] 按 vllm.gpu_ids 启动实例数: {len(gpu_groups)}")
 
     procs: List[subprocess.Popen] = []
 
-    for i in range(num_instances):
-        gid = gpu_ids_for_instance(i, per, total, gpu_offset)
+    for i, gid in enumerate(gpu_groups):
         port = base_port + i
         env, cmd = build_vllm_command(config, gpu_ids=gid, port=port)
 
         print(
-            f"[deploy] 实例 {i}: CUDA_VISIBLE_DEVICES={gid} port={port} (gpu_offset={gpu_offset})"
+            f"[deploy] 实例 {i}: CUDA_VISIBLE_DEVICES={gid} port={port}"
         )
         print("  " + " ".join(cmd))
 
@@ -231,7 +207,7 @@ def deploy_vllm_multi(config_path: str) -> None:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="根据 YAML 与 VLLM_TOTAL_GPUS 计算并部署尽可能多的 vLLM 实例。"
+        description="根据 YAML 中 vllm.gpu_ids 指定的显卡列表部署 vLLM 实例。"
     )
     parser.add_argument(
         "--config",
@@ -239,12 +215,24 @@ def parse_args():
         required=True,
         help="路径：llm_config 配置文件",
     )
+    add_wandb_args(parser)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    deploy_vllm_multi(args.config)
+    args, wandb_run = maybe_init_wandb(args, job_type="deploy")
+    try:
+        deploy_vllm_multi(args.config)
+        wandb_log(wandb_run, {"deploy_success": 1})
+        wandb_finish(
+            wandb_run,
+            status="success",
+            summary={"config_path": args.config},
+        )
+    except Exception:
+        wandb_finish(wandb_run, status="failed")
+        raise
 
 
 if __name__ == "__main__":

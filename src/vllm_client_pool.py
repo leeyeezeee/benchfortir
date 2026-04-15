@@ -11,7 +11,13 @@ from openai import AsyncOpenAI
 
 class VLLMClientPool:
     
-    def __init__(self, endpoints: List[str], api_keys: Optional[List[str]] = None, default_model: str = "Qwen2.5-72B-Instruct"):
+    def __init__(
+        self,
+        endpoints: List[str],
+        api_keys: Optional[List[str]] = None,
+        default_model: str = "Qwen2.5-72B-Instruct",
+        remote: bool = False,
+    ):
         """
         
         Args:
@@ -33,6 +39,7 @@ class VLLMClientPool:
                 )
             )
         self.default_model = default_model
+        self.remote = bool(remote)
         self.current_client_idx = 0
         self.lock = asyncio.Lock()
         self.session_to_client = {}
@@ -63,11 +70,7 @@ class VLLMClientPool:
         client = await self.get_client_for_session(session_id)
         max_attempts = 4
         model_name = params.get("model", self.default_model) or self.default_model
-        model_lower = str(model_name).lower()
-        # If the model is a chat-style model, use chat.completions instead of completions.
-        # User requirement: default_model contains gpt -> chat branch.
-        # Note: in practice o1* models also behave like chat models, so we include them to avoid known errors.
-        use_chat = ("gpt" in model_lower) or ("o1" in model_lower)
+        use_chat = self.remote
 
         stop = params.get("stop", ["</python>", "</search>", "</answer>"])
 
@@ -151,8 +154,7 @@ class VLLMClientPool:
         original_client_idx = self.session_to_client.get(session_id, self.current_client_idx)
         tried_clients = set([original_client_idx])
         model_name = params.get("model", self.default_model) or self.default_model
-        model_lower = str(model_name).lower()
-        use_chat = ("gpt" in model_lower) or ("o1" in model_lower)
+        use_chat = self.remote
         stop = params.get("stop", ["</python>", "</search>", "</answer>"])
 
         while len(tried_clients) < len(self.clients):

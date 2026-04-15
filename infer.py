@@ -14,6 +14,8 @@ try:
 except ImportError:
     yaml = None
 
+from src.wandb_config import add_wandb_args, maybe_init_wandb, wandb_finish, wandb_log
+
 infer_mode_help = """Inference mode selection
 [default]       :    Basic behavior similar to the original search tool, uses summarization and continuously appends to the assistant content.
 [completion]    :    Builds on [default] by adding feedback for exceeding the Python or search call limits, and for repeated search queries.
@@ -124,6 +126,7 @@ def _config_to_infer_defaults(c: dict) -> dict:
         return x if isinstance(x, list) else [x]
 
     defaults = {
+        "remote": bool(remote),
         "endpoints": endpoints or None,
         "model_path": c.get("model_path"),
         "api_keys": _list_or_none(api_keys) if api_keys else None,
@@ -307,6 +310,17 @@ def parse_arguments():
         type=str,
         default=defaults.get("default_model", "Qwen2.5-7B-Instruct"),
         help="Default model name to use",
+    )
+    vllm_group.add_argument(
+        "--remote",
+        type=str,
+        default=None,
+        choices=["true", "false", "1", "0"],
+        metavar="true|false",
+        help=(
+            "Whether to treat endpoint as remote OpenAI-compatible service. "
+            "If not set, value is read from config."
+        ),
     )
 
     generation_group = parser.add_argument_group("Generation Parameters")
@@ -626,6 +640,7 @@ def parse_arguments():
         help="Optional full path to interaction JSONL (overrides data_path/dataset_name/inter_filename)",
     )
 
+    add_wandb_args(parser)
     args = parser.parse_args()
 
     # --use_tool: 命令行可传 true/false；未传则用配置
@@ -633,6 +648,12 @@ def parse_arguments():
         args.use_tool = str(args.use_tool).strip().lower() in ("true", "1")
     else:
         args.use_tool = bool(defaults.get("use_tool", True))
+
+    # --remote: 命令行可传 true/false；未传则用配置
+    if args.remote is not None:
+        args.remote = str(args.remote).strip().lower() in ("true", "1")
+    else:
+        args.remote = bool(defaults.get("remote", False))
 
     # 若未从配置中获得必需字段，则要求命令行提供
     if not args.endpoints:
@@ -647,6 +668,7 @@ def parse_arguments():
 
 def get_inference_instance():
     args = parse_arguments()
+    args, wandb_run = maybe_init_wandb(args, job_type="infer")
     # Print args for debugging. WARNING: --print_keys will print sensitive values.
     if getattr(args, "print_keys", False):
         print("[infer] --- SENSITIVE DEBUG (print_keys enabled) ---")
@@ -664,7 +686,7 @@ def get_inference_instance():
         except ImportError:
             from src.inference_engine_inter import AsyncInteractionInference as AsyncInfer
         inference = AsyncInfer(args)
-        return inference
+        return inference, wandb_run
 
     # Default math/QA inference engines
     try:
@@ -679,13 +701,19 @@ def get_inference_instance():
             from src.inference_engine import AsyncInference as AsyncInfer
 
     inference = AsyncInfer(args)
-    return inference
+    return inference, wandb_run
 
 
 async def main():
-    inference = get_inference_instance()
-    await inference.run()
-    sys.exit(0)
+    inference, wandb_run = get_inference_instance()
+    try:
+        await inference.run()
+        wandb_log(wandb_run, {"infer_success": 1})
+        wandb_finish(wandb_run, status="success")
+        sys.exit(0)
+    except Exception:
+        wandb_finish(wandb_run, status="failed")
+        raise
 
 
 if __name__ == "__main__":

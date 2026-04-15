@@ -77,6 +77,7 @@ class AsyncInteractionInference:
             endpoints=args.endpoints,
             api_keys=args.api_keys,
             default_model=args.default_model,
+            remote=args.remote,
         )
 
         # Prompt manager for agent (interaction prompt)

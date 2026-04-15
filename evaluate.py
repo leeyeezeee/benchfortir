@@ -103,6 +103,7 @@ except ImportError:
     yaml = None
 
 from src.evaluator import Evaluator
+from src.wandb_config import add_wandb_args, maybe_init_wandb, wandb_finish, wandb_log
 
 
 def _load_yaml(path: str) -> dict:
@@ -271,6 +272,7 @@ def _parse_args() -> argparse.Namespace:
         help="Tokenizer name/path for estimating token usage. Usually the same as infer.py --model_path.",
     )
 
+    add_wandb_args(parser)
     args = parser.parse_args(remaining)
 
     # Required checks
@@ -296,6 +298,7 @@ def _parse_args() -> argparse.Namespace:
 
 async def main() -> dict:
     args = _parse_args()
+    args, wandb_run = maybe_init_wandb(args, job_type="evaluate")
 
     try:
         print(f"Model output file path: {args.output_path}")
@@ -320,6 +323,8 @@ async def main() -> dict:
         print(f"Overall metrics path: {evaluator.output_metrics_overall_path}")
 
         overall_metrics = await evaluator.run(data, timeout=args.timeout)
+        wandb_log(wandb_run, overall_metrics)
+        wandb_finish(wandb_run, status="success", summary=overall_metrics)
         return overall_metrics
 
     except Exception as e:
@@ -327,6 +332,7 @@ async def main() -> dict:
         import traceback
 
         traceback.print_exc()
+        wandb_finish(wandb_run, status="failed")
         return {"status": "error", "message": str(e)}
 
 

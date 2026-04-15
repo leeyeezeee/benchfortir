@@ -23,7 +23,7 @@ vllm:
   host: 0.0.0.0
   port: 8001
   # 单实例 TP：让一个 vLLM 进程使用两张卡做 tensor parallel
-  gpu_ids: "0,1"                    # 映射到 CUDA_VISIBLE_DEVICES
+  gpu_ids: ["0,1","2,3"]                     # 映射到 CUDA_VISIBLE_DEVICES
   tensor_parallel_size: 2
   max_model_len: 32768             # --max-model-len
   gpu_memory_utilization: 0.9

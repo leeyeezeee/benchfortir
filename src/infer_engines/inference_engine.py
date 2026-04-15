@@ -25,6 +25,7 @@ class AsyncInference:
             endpoints=args.endpoints,
             api_keys=args.api_keys,
             default_model=args.default_model,
+            remote=args.remote,
         )
 
         self.prompt_manager = PromptManager(args.prompt_type, args.use_tool)
