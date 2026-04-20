@@ -24,7 +24,6 @@ import os
 import subprocess
 import sys
 from typing import Any, Dict, List, Tuple
-from src.wandb_config import add_wandb_args, maybe_init_wandb, wandb_finish, wandb_log
 
 try:
     import yaml
@@ -215,24 +214,12 @@ def parse_args():
         required=True,
         help="路径：llm_config 配置文件",
     )
-    add_wandb_args(parser)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    args, wandb_run = maybe_init_wandb(args, job_type="deploy")
-    try:
-        deploy_vllm_multi(args.config)
-        wandb_log(wandb_run, {"deploy_success": 1})
-        wandb_finish(
-            wandb_run,
-            status="success",
-            summary={"config_path": args.config},
-        )
-    except Exception:
-        wandb_finish(wandb_run, status="failed")
-        raise
+    deploy_vllm_multi(args.config)
 
 
 if __name__ == "__main__":

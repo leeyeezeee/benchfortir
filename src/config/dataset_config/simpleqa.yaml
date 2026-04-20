@@ -1,8 +1,5 @@
-# ========== 数据集配置：SimpleQA ==========
-# DataLoader: SimpleQA 分支 → question；answer 为 json 列表时取首元素为字符串
-# 短事实问答；数据：{data_path}/SimpleQA/test.jsonl（字段 question, answer）
 dataset_name: SimpleQA
-data_path: data
-output_path: results
 prompt_type: code_search
 sample_timeout: 1200
+task: qa
+timeout: 18000

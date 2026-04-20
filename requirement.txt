@@ -299,7 +299,7 @@ uvloop==0.21.0
 verl==0.4.0
 virtualenv==20.30.0
 vllm==0.8.4
-wandb==0.19.10
+sacred==0.8.7
 watchfiles==1.0.5
 waybackpy==3.0.6
 wbdata==1.0.0

@@ -1,0 +1,57 @@
+# Shared defaults for inference and evaluation.
+
+# Common paths
+data_path: data
+output_path: results
+
+# Inference defaults
+temperature: 0.2
+max_tokens: 4096
+top_p: 0.95
+top_k: 20
+min_p: 0.0
+repetition_penalty: 1.1
+include_stop_str_in_output: true
+max_concurrent_requests: 12
+counts: 500
+use_tool: true
+
+# Tool defaults
+max_python_times: 5
+max_search_times: 3
+max_read_times: 3
+sample_timeout: 1200
+conda_path: /home/lyz/miniconda3
+conda_env: tool
+python_max_concurrent: 32
+read_allowed_roots: null
+read_max_chars: 8000
+read_timeout: 30
+read_enable_ocr: false
+use_local_search: false
+local_search_url: 127.0.0.1:6006
+compatible_search: true
+bing_api_key: "1fe0c252-f2e3-40b2-8e9b-096e74e60465"
+bing_zone: serp_api2
+search_max_results: 10
+search_result_length: 1000
+bing_requests_per_second: 1.0
+bing_max_retries: 3
+bing_retry_delay: 1.0
+search_cache_file: search_cache.db
+url_cache_file: search_url_cache.db
+summ_model_urls:
+  - http://localhost:8004/v1
+summ_model_name: Qwen2.5-72B-Instruct
+summ_model_path: null
+max_sequence_length: 20000
+use_sds: false
+
+# Evaluation defaults
+use_llm: true
+api_base_url: https://api.moonshot.cn/v1
+model_name: kimi-k2-0905-preview
+api_key: sk-IvXK1GcIhwXbaCm62ceqcsUVB1qNbB8upHnhzOOgGVgd5Txq
+concurrent_limit: 50
+timeout: 1800
+tokenizer_path: null

@@ -1,12 +1,6 @@
-# ========== 数据集配置：Interaction（电商客服多轮对话） ==========
-# InteractionDataLoader 与 DataLoader 对齐：data_path + dataset_name + 文件名。
-# 默认依次尝试 data/interaction/test.jsonl、data/interaction/task1_templates.jsonl。
-# 也可用 inter_filename / inter_data_path 覆盖（见 data_loader_inter.py）。
-
 dataset_name: interaction
-data_path: data
-# 与 gsm8k500 等一致：output_path 为输出目录；结果文件为 {output_path}/{dataset}_{default_model}_output.jsonl
-output_path: results
 prompt_type: interaction
 sample_timeout: 600
 max_turns: 10
+task: interaction
+timeout: 1800

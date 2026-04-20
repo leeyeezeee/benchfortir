@@ -91,31 +91,19 @@ import sys
 import os
 sys.path.append(os.getcwd())
 
-import argparse
 import asyncio
 import json
 import time
-from typing import Any, List
-
-try:
-    import yaml  # type: ignore
-except ImportError:
-    yaml = None
+from typing import Any, List, Optional, Sequence
 
 from src.evaluator import Evaluator
-from src.wandb_config import add_wandb_args, maybe_init_wandb, wandb_finish, wandb_log
-
-
-def _load_yaml(path: str) -> dict:
-    """Load a YAML file; return empty dict if file missing or invalid."""
-    if not yaml or not path or not os.path.isfile(path):
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
+from src.sacred_config import (
+    build_experiment,
+    dict_to_namespace,
+    load_yaml,
+    parse_bootstrap_args,
+    resolve_named_yaml,
+)
 
 
 def _load_output_file(path: str) -> List[Any]:
@@ -158,147 +146,121 @@ def _load_output_file(path: str) -> List[Any]:
     raise ValueError(f"Unsupported file format: {ext} (supported: .json, .jsonl, .txt)")
 
 
-def _parse_args() -> argparse.Namespace:
-    """
-    Parse CLI args for evaluation.
+def _evaluate_base_config() -> dict:
+    return {
+        "default_config": "default",
+        "dataset_config": None,
+        "output_path": None,
+        "task": None,
+        "use_llm": False,
+        "api_base_url": None,
+        "model_name": None,
+        "api_key": "EMPTY",
+        "concurrent_limit": 50,
+        "timeout": 1800,
+        "tokenizer_path": None,
+    }
 
-    Supports optional config files:
-    - --eval_config: path to YAML with eval defaults (task/use_llm/api_base_url/...)
-    - --dataset_config: path to YAML with dataset defaults (dataset_name/output_path)
-    """
-    # First pass: only parse config paths
-    config_parser = argparse.ArgumentParser(add_help=False)
-    config_parser.add_argument(
-        "--eval_config",
-        type=str,
-        default=None,
-        help="Path to eval config YAML (e.g., src/config/eval/eval.yaml or src/config/eval_config/eval_expo.yaml).",
+
+def _coerce_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes", "y", "on"}:
+            return True
+        if lowered in {"false", "0", "no", "n", "off"}:
+            return False
+    return bool(value)
+
+
+def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
+    bootstrap, sacred_argv = parse_bootstrap_args(
+        argv,
+        description="Evaluation bootstrap options",
+        options=(
+            ("--default_config", {"type": str, "default": "default"}),
+            ("--dataset_config", {"type": str, "default": None}),
+        ),
     )
-    config_parser.add_argument(
-        "--dataset_config",
-        type=str,
-        default=None,
-        help="Path to dataset config YAML (e.g., src/config/dataset_config/example.yaml).",
+
+    default_name = bootstrap.default_config.strip() if bootstrap.default_config else ""
+    if default_name.lower().endswith(".yaml"):
+        default_file = default_name
+    elif default_name.lower().endswith(".yml"):
+        default_file = default_name[:-4] + ".yaml"
+    else:
+        default_file = default_name + ".yaml"
+    default_path = os.path.join(os.getcwd(), "src", "config", default_file)
+    dataset_path = resolve_named_yaml(
+        bootstrap.dataset_config,
+        "dataset_config",
+        root_dir=os.getcwd(),
     )
-    config_args, remaining = config_parser.parse_known_args()
 
-    # Load eval defaults
-    eval_defaults: dict = {}
-    if config_args.eval_config and os.path.exists(config_args.eval_config):
-        eval_defaults = _load_yaml(config_args.eval_config)
+    for label, raw, resolved in (
+        ("default_config", bootstrap.default_config, default_path),
+        ("dataset_config", bootstrap.dataset_config, dataset_path),
+    ):
+        if raw and resolved and not os.path.isfile(resolved):
+            print(f"[evaluate] Warning: {label} not found: {resolved} (from {raw!r})")
 
-    # Load dataset defaults
-    dataset_defaults: dict = {}
-    if config_args.dataset_config and os.path.exists(config_args.dataset_config):
-        dataset_defaults = _load_yaml(config_args.dataset_config)
+    default_defaults = load_yaml(default_path)
+    dataset_defaults = load_yaml(dataset_path)
 
-    # Derive default output_path from dataset defaults if possible
-    default_output_path: Any = None
+    runtime_config = _evaluate_base_config()
+    runtime_config.update(
+        {
+            "default_config": bootstrap.default_config,
+            "dataset_config": bootstrap.dataset_config,
+        }
+    )
+    runtime_config.update(default_defaults)
+    runtime_config.update(dataset_defaults)
+
     ds_name = dataset_defaults.get("dataset_name")
     ds_out_root = dataset_defaults.get("output_path")
     if ds_name and ds_out_root:
-        # 默认推理输出命名规则：{output_path}/{dataset_name}_output.json
-        default_output_path = os.path.join(ds_out_root, f"{ds_name}_output.json")
+        runtime_config["output_path"] = os.path.join(ds_out_root, f"{ds_name}_output.json")
 
-    parser = argparse.ArgumentParser(
-        description="Evaluation Tool (TIR metrics)",
-        parents=[config_parser],
-    )
+    loaded_from = []
+    if default_path and os.path.isfile(default_path):
+        loaded_from.append(f"default={default_path}")
+    if dataset_path and os.path.isfile(dataset_path):
+        loaded_from.append(f"dataset={dataset_path}")
+    if loaded_from:
+        print(f"[evaluate] Loaded config defaults from: {', '.join(loaded_from)}")
 
-    parser.add_argument(
-        "--output_path",
-        type=str,
-        default=default_output_path,
-        help=(
-            "Path to the model output file produced by infer.py (.json or .jsonl). "
-            "If omitted, and --dataset_config is provided with dataset_name/output_path, "
-            "it defaults to {output_path}/{dataset_name}_output.json from that config."
-        ),
-    )
-    parser.add_argument(
-        "--task",
-        type=str,
-        default=eval_defaults.get("task"),
-        choices=["math", "qa", "expodesign", "interaction"],
-        help="Task type. qa => EM/F1; math => correctness with math equivalence.",
-    )
+    return runtime_config, sacred_argv
 
-    # Optional: LLM-based judging
-    parser.add_argument(
-        "--use_llm",
-        action="store_true",
-        default=bool(eval_defaults.get("use_llm", False)),
-        help="Use LLM for equivalence / interaction evaluation",
-    )
-    parser.add_argument(
-        "--api_base_url",
-        type=str,
-        default=eval_defaults.get("api_base_url"),
-        help="Base URL of the LLM API used as judge.",
-    )
-    parser.add_argument(
-        "--model_name",
-        type=str,
-        default=eval_defaults.get("model_name"),
-        help="Name of the LLM model used for evaluation.",
-    )
-    parser.add_argument(
-        "--api_key",
-        type=str,
-        default=eval_defaults.get("api_key", "EMPTY"),
-        help="API key for LLM judge (if needed).",
-    )
 
-    parser.add_argument(
-        "--concurrent_limit",
-        type=int,
-        default=int(eval_defaults.get("concurrent_limit", 50)),
-        help="Max concurrent evaluations.",
-    )
+def _normalize_eval_config(config: dict):
+    config["use_llm"] = _coerce_bool(config.get("use_llm"))
+    if config["use_llm"] is None:
+        config["use_llm"] = False
 
-    # IMPORTANT: this is a per-sample timeout (used inside Evaluator.evaluate_batch)
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=int(eval_defaults.get("timeout", 1800)),
-        help="Per-sample evaluation timeout (seconds).",
-    )
-
-    # Optional: tokenizer for token counting
-    parser.add_argument(
-        "--tokenizer_path",
-        type=str,
-        default=eval_defaults.get("tokenizer_path"),
-        help="Tokenizer name/path for estimating token usage. Usually the same as infer.py --model_path.",
-    )
-
-    add_wandb_args(parser)
-    args = parser.parse_args(remaining)
-
-    # Required checks
-    if not args.task:
-        parser.error(
-            "--task is required (either via --task or via eval_config with a 'task' field)."
+    if not config.get("task"):
+        raise ValueError(
+            "task is required. Provide it in dataset_config or override with Sacred, "
+            "for example: with task='math'"
         )
-    if not args.output_path:
-        parser.error(
-            "--output_path is required when it cannot be derived from --dataset_config. "
-            "Provide it explicitly or supply a dataset_config with 'dataset_name' and 'output_path'."
+    if not config.get("output_path"):
+        raise ValueError(
+            "output_path is required when it cannot be derived from dataset_config. "
+            "Override with Sacred, for example: with output_path='results/math_output.json'"
         )
-
-    # If use_llm is enabled, ensure basic judge config is present
-    if args.use_llm and (not args.api_base_url or not args.model_name):
-        parser.error(
-            "--use_llm requires both --api_base_url and --model_name "
-            "(or corresponding fields in eval_config)."
+    if config["use_llm"] and (not config.get("api_base_url") or not config.get("model_name")):
+        raise ValueError(
+            "use_llm requires api_base_url and model_name. "
+            "Set them in default.yaml or override with Sacred."
         )
+    return dict_to_namespace(config)
 
-    return args
 
-
-async def main() -> dict:
-    args = _parse_args()
-    args, wandb_run = maybe_init_wandb(args, job_type="evaluate")
+async def main(config: dict) -> dict:
+    args = _normalize_eval_config(config)
 
     try:
         print(f"Model output file path: {args.output_path}")
@@ -322,22 +284,47 @@ async def main() -> dict:
         print(f"Detailed metrics path: {evaluator.output_metrics_path}")
         print(f"Overall metrics path: {evaluator.output_metrics_overall_path}")
 
-        overall_metrics = await evaluator.run(data, timeout=args.timeout)
-        wandb_log(wandb_run, overall_metrics)
-        wandb_finish(wandb_run, status="success", summary=overall_metrics)
-        return overall_metrics
+        return await evaluator.run(data, timeout=args.timeout)
 
     except Exception as e:
         print(f"Error: {e}")
         import traceback
 
         traceback.print_exc()
-        wandb_finish(wandb_run, status="failed")
         return {"status": "error", "message": str(e)}
 
 
+def run_from_cli(argv: Optional[Sequence[str]] = None):
+    cli_args = list(argv if argv is not None else sys.argv[1:])
+    bootstrap, _ = parse_bootstrap_args(
+        cli_args,
+        description="Evaluation bootstrap options",
+        options=(
+            ("--default_config", {"type": str, "default": "default"}),
+            ("--dataset_config", {"type": str, "default": None}),
+        ),
+    )
+    base_config, sacred_argv = _build_runtime_config(cli_args)
+
+    experiment = build_experiment("evaluation_metrics", base_config)
+
+    @experiment.main
+    def evaluate_entry(_config):
+        return asyncio.run(main(dict(_config)))
+
+    if getattr(bootstrap, "_show_help", False):
+        print("Bootstrap options: --default_config <name> --dataset_config <name>")
+        print(
+            "Sacred overrides: python evaluate.py --dataset_config math500 "
+            "with output_path='results/math_output.json'"
+        )
+
+    results = experiment.run_commandline(sacred_argv)
+    return results.result
+
+
 if __name__ == "__main__":
-    results = asyncio.run(main())
+    results = run_from_cli()
 
     if results.get("status") in {"error", "timeout"}:
         print(f"\n===== Evaluation Not Completed: {results.get('status')} =====")

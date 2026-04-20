@@ -1,9 +1,5 @@
-# ========== 数据集配置：Math500 ==========
-# DataLoader: else branch → question, answer
-# 数据文件：{data_path}/{dataset_name}/test.jsonl
-
 dataset_name: math
-data_path: data
-output_path: results
 prompt_type: math
 sample_timeout: 1200
+task: math
+timeout: 18000

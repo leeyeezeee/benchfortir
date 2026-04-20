@@ -1,9 +1,5 @@
-# ========== 数据集配置：SQuAD 2.0 ==========
-# DataLoader: squadv2 → question；可答为 answers 中去重后的多参考 list（max EM/F1）；不可答为 ""
-# 评测使用 task_type=qa；无答案样本见 metrics.evaluate_qa_prediction 对空金标的处理
-
 dataset_name: squadv2
-data_path: data
-output_path: results
 prompt_type: code_search
 sample_timeout: 2400
+task: qa
+timeout: 18000
