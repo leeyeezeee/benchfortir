@@ -1,6 +1,0 @@
-dataset_name: interaction
-prompt_type: interaction
-sample_timeout: 600
-max_turns: 10
-task: interaction
-timeout: 1800

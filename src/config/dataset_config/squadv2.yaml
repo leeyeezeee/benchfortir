@@ -1,5 +1,0 @@
-dataset_name: squadv2
-prompt_type: code_search
-sample_timeout: 2400
-task: qa
-timeout: 18000

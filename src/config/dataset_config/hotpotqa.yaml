@@ -1,5 +1,0 @@
-dataset_name: hotpotqa
-prompt_type: code_search
-sample_timeout: 1200
-task: qa
-timeout: 18000

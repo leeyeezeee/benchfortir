@@ -1,5 +1,0 @@
-dataset_name: gsm8k
-prompt_type: math
-sample_timeout: 600
-task: math
-timeout: 18000
