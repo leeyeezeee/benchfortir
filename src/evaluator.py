@@ -155,6 +155,18 @@ except Exception:  # pragma: no cover
     AutoTokenizer = None  # type: ignore
 
 
+def _tqdm_kwargs() -> Dict[str, Any]:
+    """Use stable single-line tqdm rendering; disable on non-TTY."""
+    return {
+        "file": sys.stdout,
+        "dynamic_ncols": False,
+        "mininterval": 0.5,
+        "position": 0,
+        "leave": True,
+        "disable": not sys.stdout.isatty(),
+    }
+
+
 def _extract_tag_contents(text: str, tag: str) -> List[str]:
     """Extract all contents inside paired <tag>...</tag> blocks."""
     if not text:
@@ -685,14 +697,14 @@ class Evaluator:
                     else:
                         metrics = await asyncio.wait_for(self.evaluate_sample(item), timeout=timeout)
                 except asyncio.TimeoutError:
-                    print(f"Warning: Evaluation timed out ({timeout} seconds)")
+                    async_tqdm.write(f"Warning: Evaluation timed out ({timeout} seconds)")
                     metrics = {"status": "timeout"}
                 item_copy = item.copy()
                 item_copy["metrics"] = metrics
                 return item_copy
 
         tasks = [_evaluate_with_semaphore(item) for item in data]
-        results = await async_tqdm.gather(*tasks, desc="Evaluating samples")
+        results = await async_tqdm.gather(*tasks, desc="Evaluating samples", **_tqdm_kwargs())
         return results
 
     async def run(self, data: List[Dict[str, Any]], timeout: Optional[int] = None) -> Dict[str, Any]:

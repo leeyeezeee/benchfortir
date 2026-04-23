@@ -4,9 +4,11 @@ set -euo pipefail
 # 通过 deploy.py 启动 vLLM（可多实例，逻辑见 deploy.py）。
 # 设置 VLLM_TOTAL_GPUS（或 DEPLOY_TOTAL_GPUS）与 LLM_CONFIG 中 vllm.tensor_parallel_size 决定实例数。
 
-cd "$(dirname "$0")"
+# 统一在仓库根目录执行，确保 deploy.py 与相对配置路径可解析
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 
-LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_32B.yaml}"
+LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_4B.yaml}"
 export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"
 
 echo "[start_vllm] Using config: ${LLM_CONFIG} VLLM_TOTAL_GPUS=${VLLM_TOTAL_GPUS}"

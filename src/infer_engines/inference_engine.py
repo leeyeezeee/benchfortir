@@ -2,6 +2,7 @@ import asyncio
 import time
 import json
 import os
+import sys
 
 from vllm import SamplingParams
 from transformers import AutoTokenizer
@@ -14,6 +15,19 @@ from ..tools.tool_executor import ToolExecutor
 from ..tools import PythonTool, BingSearchTool, BingSearchToolSDS, SummarizeTool, LocalSearchTool, ReadTool
 from ..vllm_client_pool import VLLMClientPool
 from ..processors.sample_processor import SampleProcessor, SampleProcessorCompletion
+
+
+def _tqdm_kwargs() -> Dict[str, Any]:
+    """Use stable single-line tqdm rendering; disable on non-TTY."""
+    return {
+        "file": sys.stdout,
+        "dynamic_ncols": False,
+        "mininterval": 0.5,
+        "position": 0,
+        "leave": True,
+        "disable": not sys.stdout.isatty(),
+    }
+
 
 # 异步推理主类
 class AsyncInference:
@@ -228,7 +242,7 @@ class AsyncInference:
                 if partial_result:
                     partial_output = partial_result.get("output", "Timeout")
                     partial_prediction = partial_result.get("prediction", "Timeout")
-                    print(f"Sample timeout ({self.sample_timeout}): '{question}'")
+                    async_tqdm.write(f"Sample timeout ({self.sample_timeout}): '{question}'")
                 else:
                     partial_output = "Timeout"
                     partial_prediction = "Timeout"
@@ -318,7 +332,7 @@ class AsyncInference:
                 )
             )
         # 进度条显示
-        pbar = async_tqdm(total=total_examples, desc="Processing samples")
+        pbar = async_tqdm(total=total_examples, desc="Processing samples", **_tqdm_kwargs())
         processed = 0
         while processed < total_examples:
             # 统计已完成的任务数

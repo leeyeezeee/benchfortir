@@ -10,41 +10,17 @@ from typing import Optional, Sequence
 
 from src.sacred_config import (
     build_experiment,
+    derive_output_path,
     dict_to_namespace,
     load_yaml,
     parse_bootstrap_args,
     resolve_named_yaml,
 )
 
-infer_mode_help = """Inference mode selection
-[default]       :    Basic behavior similar to the original search tool, uses summarization and continuously appends to the assistant content.
-[completion]    :    Builds on [default] by adding feedback for exceeding the Python or search call limits, and for repeated search queries.
-[completion_sds]:    Builds on [completion] by using a simple deep search engine.
-"""
-
 
 def resolve_config_yaml_path(raw: Optional[str], config_subdir: str) -> Optional[str]:
     """Resolve ``<name>.yaml`` from ``src/config/<config_subdir>``."""
     return resolve_named_yaml(raw, config_subdir, root_dir=os.getcwd())
-
-
-def resolve_default_yaml_path(raw: Optional[str]) -> Optional[str]:
-    """Resolve ``default.yaml`` from ``src/config``."""
-    if not raw:
-        return None
-    stem = raw.strip()
-    if not stem:
-        return None
-    if "/" in stem or "\\" in stem:
-        print(f"[infer] Warning: --default_config expects a file name only; ignored: {raw!r}")
-        return None
-    if stem.lower().endswith(".yaml"):
-        filename = stem
-    elif stem.lower().endswith(".yml"):
-        filename = stem[:-4] + ".yaml"
-    else:
-        filename = stem + ".yaml"
-    return os.path.join(os.getcwd(), "src", "config", filename)
 
 
 def load_config_defaults(
@@ -258,7 +234,12 @@ def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
         ),
     )
 
-    default_resolved = resolve_default_yaml_path(bootstrap.default_config)
+    default_resolved = resolve_named_yaml(
+        bootstrap.default_config,
+        "",
+        root_dir=os.getcwd(),
+        option_name="default_config",
+    )
     llm_resolved = resolve_config_yaml_path(bootstrap.llm_config, "llm_config")
     dataset_resolved = resolve_config_yaml_path(bootstrap.dataset_config, "dataset_config")
 
@@ -286,6 +267,18 @@ def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
         dataset_config_path=dataset_resolved,
     )
     runtime_config.update(defaults)
+    model_name = runtime_config.get("default_model")
+    if not model_name:
+        raise ValueError(
+            "default_model is required in llm_config for output_path derivation. "
+            "Set it in llm_config or override with Sacred, for example: with default_model='Qwen3-4B'"
+        )
+    runtime_config["output_path"] = derive_output_path(
+        current_output=runtime_config.get("output_path"),
+        dataset_name=runtime_config.get("dataset_name"),
+        use_tool=runtime_config.get("use_tool"),
+        model_name=model_name,
+    )
 
     loaded_from = []
     if default_resolved and os.path.isfile(default_resolved):

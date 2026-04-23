@@ -9,21 +9,17 @@ set -euo pipefail
 # - use_tool=false
 #
 # infer.py is invoked in the recommended way:
-#   python infer.py --llm_config ... --dataset_config ... --tool_config ...
+#   python infer.py --llm_config ... --dataset_config ...
 
-cd "$(dirname "$0")"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 
-# infer.py 只接受配置文件名（stem），对应 src/config/<llm_config|dataset_config|tool_config>/
+# infer.py 只接受配置文件名（stem），对应 src/config/<llm_config|dataset_config>/
 LLM_CONFIG="${LLM_CONFIG:-Qwen3_4B}"
-TOOL_CONFIG="${TOOL_CONFIG:-example}"
 : "${DATASET_NAMES:=hotpotqa squadv2 }"
 : "${DATASET_NAMES_NOTOOL:=}"
-OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/qwen3_4b}"
-OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/qwen3_4b}"
 
 export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"
-
-mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL"
 
 # vLLM 多实例端口从 BASE_PORT 递增（4B：tensor_parallel_size=1 → 4 个实例）
 # 注意：这里 endpoints 写死为 base..base+3；确保你部署时的端口起点一致。
@@ -38,10 +34,8 @@ ENDPOINTS=(
 )
 
 echo "[run_infer_4b] Using LLM_CONFIG=$LLM_CONFIG"
-echo "[run_infer_4b] Using TOOL_CONFIG=$TOOL_CONFIG"
 echo "[run_infer_4b] DATASET_NAMES=$DATASET_NAMES"
-echo "[run_infer_4b] Output(use_tool=true)  -> $OUTPUT_DIR_TOOL"
-echo "[run_infer_4b] Output(use_tool=false) -> $OUTPUT_DIR_NOTOOL"
+echo "[run_infer_4b] Output path is inferred by infer.py (use_tool/model/dataset)."
 echo "[run_infer_4b] Endpoints: ${ENDPOINTS[*]}"
 
 echo "[run_infer_4b] Waiting for vLLM to be ready..."
@@ -52,9 +46,7 @@ for name in $DATASET_NAMES; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    --tool_config "$TOOL_CONFIG" \
     --use_tool true \
-    --output_path "$OUTPUT_DIR_TOOL" \
     --endpoints "${ENDPOINTS[@]}" 
 done
 
@@ -63,9 +55,7 @@ for name in $DATASET_NAMES_NOTOOL; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    --tool_config "$TOOL_CONFIG" \
     --use_tool false \
-    --output_path "$OUTPUT_DIR_NOTOOL" \
     --endpoints "${ENDPOINTS[@]}" \
     2>/dev/null
 done

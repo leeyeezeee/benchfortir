@@ -13,34 +13,27 @@ set -euo pipefail
 #   MODEL_PATH        tokenizer 路径（默认 Qwen/Qwen2.5-7B-Instruct）
 #   DEFAULT_MODEL     默认 gpt-4o
 #   LLM_CONFIG        默认 gpt4o
-#   TOOL_CONFIG       默认 example
 
-cd "$(dirname "$0")"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 
 LLM_CONFIG="${LLM_CONFIG:-gpt_5}"
-TOOL_CONFIG="${TOOL_CONFIG:-example}"
 : "${DATASET_NAMES:=hotpotqa squadv2}"
 : "${DATASET_NAMES_NOTOOL:=}"
-OUTPUT_DIR_TOOL="${OUTPUT_DIR_TOOL:-results/tool/gpt_5}"
-OUTPUT_DIR_NOTOOL="${OUTPUT_DIR_NOTOOL:-results/notool/gpt_5}"
 MODEL_PATH="${MODEL_PATH:-/data/lyz/models/Qwen3-32B}"
 
 
-mkdir -p "$OUTPUT_DIR_TOOL" "$OUTPUT_DIR_NOTOOL"
 echo "[run_infer_gpt4o] LLM_CONFIG=$LLM_CONFIG"
 echo "[run_infer_gpt4o] MODEL_PATH=$MODEL_PATH"
 echo "[run_infer_gpt4o] DATASET_NAMES=$DATASET_NAMES"
-echo "[run_infer_gpt4o] Output(use_tool=true)  -> $OUTPUT_DIR_TOOL"
-echo "[run_infer_gpt4o] Output(use_tool=false) -> $OUTPUT_DIR_NOTOOL"
+echo "[run_infer_gpt4o] Output path is inferred by infer.py (use_tool/model/dataset)."
 
 for name in $DATASET_NAMES; do
   echo "========== Infer (use_tool=true): $name =========="
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    --tool_config "$TOOL_CONFIG" \
     --use_tool true \
-    --output_path "$OUTPUT_DIR_TOOL" \
     --model_path "$MODEL_PATH" 
 done
 
@@ -49,9 +42,7 @@ for name in $DATASET_NAMES_NOTOOL; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    --tool_config "$TOOL_CONFIG" \
     --use_tool false \
-    --output_path "$OUTPUT_DIR_NOTOOL" \
     --model_path "$MODEL_PATH" \
     2>/dev/null
 done

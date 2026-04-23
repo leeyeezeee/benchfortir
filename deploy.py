@@ -32,6 +32,21 @@ except ImportError:
     sys.exit(1)
 
 
+def pid_file_path() -> str:
+    """Return PID file path for deployed local vLLM instances."""
+    run_dir = os.path.join(os.getcwd(), "run")
+    os.makedirs(run_dir, exist_ok=True)
+    return os.path.join(run_dir, "vllm_pids.txt")
+
+
+def write_pid_file(pids: List[int]) -> None:
+    path = pid_file_path()
+    with open(path, "w", encoding="utf-8") as f:
+        for pid in pids:
+            f.write(f"{pid}\n")
+    print(f"[deploy] PID 文件已写入: {path}")
+
+
 def load_config(path: str) -> Dict[str, Any]:
     if not os.path.exists(path):
         raise FileNotFoundError(f"配置文件不存在: {path}")
@@ -113,7 +128,7 @@ def build_vllm_command(
     port: int,
 ) -> Tuple[Dict[str, str], list]:
     """构建 vllm serve；gpu_ids 与 port 按实例覆盖（YAML 中 vllm.gpu_ids / port 仅作模板时不再用于多实例）。"""
-    llm_name = config.get("llm_name") or config.get("llm_nmae")
+    llm_name = config.get("llm_name")
     model_path = config.get("model_path")
     default_model = config.get("default_model") or llm_name
 
@@ -202,6 +217,7 @@ def deploy_vllm_multi(config_path: str) -> None:
         print(f"[deploy] 实例 {i} 已启动，PID = {proc.pid}")
 
     print(f"[deploy] 共启动 {len(procs)} 个 vLLM 进程。")
+    write_pid_file([proc.pid for proc in procs])
 
 
 def parse_args():

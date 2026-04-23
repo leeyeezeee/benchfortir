@@ -1,92 +1,4 @@
 #!/usr/bin/env python
-"""benchfortir/evaluate.py
-
-Evaluate *already generated* model outputs and compute TIR benchmark metrics.
-
-This script DOES NOT run inference.
-You must first run `infer.py` to produce an output file, then run this script
-against that output file.
-
-=================
-Input: --output_path
-=================
-`--output_path` must point to a file produced by this repository's inference
-pipeline (see `src/inference_engine.py` and `src/sample_processor.py`).
-
-Supported file types:
-- .json   : a single JSON array, i.e. `List[Dict[str, Any]]`
-- .jsonl  : JSON Lines, i.e. one `Dict[str, Any]` per line
-- .txt    : treated the same as .jsonl
-
-Each sample record is a JSON object (Python: `Dict[str, Any]`).
-
-The *typical* schema produced by this repo looks like:
-
-Required fields (for correctness metrics)
-----------------------------------------
-- input (str): the question / problem text shown to the model.
-- answer (str | List[str] | bool): the gold answer(s).
-    * math benchmarks usually provide a string answer
-    * QA benchmarks may provide a string or a list of acceptable answers
-- prediction (str): the extracted final answer produced by `src/utils.extract_answer`.
-
-Optional fields (for process/tool/cost metrics)
-----------------------------------------------
-- output (str): the full interaction trace (assistant output + tool tags/results),
-  usually containing tags emitted by the prompt template:
-    <think>...</think>   intermediate reasoning (not always present)
-    <search>...</search> search tool call (may appear multiple times)
-    <python>...</python> python tool call (may appear multiple times)
-    <result>...</result> tool result blocks inserted by the system
-    <answer>...</answer> final answer block
-
-- instruction (str): the system prompt.
-- timing (dict): timing info written by `SampleProcessor.log_timing()`, e.g.
-    {
-      "llm_time": float,
-      "python_time": float,
-      "search_time": float,
-      "read_time": float,
-      "total_time": float
-    }
-
-=================
-Outputs
-=================
-Two files are written next to the input file:
-
-1) Per-sample metrics
-   <output_path_without_ext>_metrics.json
-   Type: `List[Dict[str, Any]]`
-   Each element is the original sample record plus an extra key:
-      - metrics (dict): per-sample metrics
-
-2) Aggregated metrics
-   <output_path_without_ext>_metrics_overall.json
-   Type: `Dict[str, Any]`
-   Contains overall averages/sums for correctness, tool usage, and cost metrics.
-
-=================
-Token accounting
-=================
-The inference pipeline does not store token usage by default.
-
-If you provide `--tokenizer_path`, the evaluator will *estimate* token usage by
-re-tokenizing:
-- the prompt reconstructed from (instruction, input)
-- plus the stored full trace (output)
-
-This is an approximation. It is useful for comparing relative space cost across
-runs, but may not match the exact token counts used internally by vLLM.
-
-Return value
-============
-`main()` returns the aggregated metrics dictionary (same content as the overall
-metrics JSON written to disk). On failure, it returns:
-    {"status": "error", "message": "..."}
-
-"""
-
 import sys
 import os
 sys.path.append(os.getcwd())
@@ -99,6 +11,7 @@ from typing import Any, List, Optional, Sequence
 from src.evaluator import Evaluator
 from src.sacred_config import (
     build_experiment,
+    derive_output_path,
     dict_to_namespace,
     load_yaml,
     parse_bootstrap_args,
@@ -149,7 +62,9 @@ def _load_output_file(path: str) -> List[Any]:
 def _evaluate_base_config() -> dict:
     return {
         "default_config": "default",
+        "llm_config": None,
         "dataset_config": None,
+        "use_tool": True,
         "output_path": None,
         "task": None,
         "use_llm": False,
@@ -182,6 +97,7 @@ def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
         description="Evaluation bootstrap options",
         options=(
             ("--default_config", {"type": str, "default": "default"}),
+            ("--llm_config", {"type": str, "default": None}),
             ("--dataset_config", {"type": str, "default": None}),
         ),
     )
@@ -199,35 +115,60 @@ def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
         "dataset_config",
         root_dir=os.getcwd(),
     )
+    llm_path = resolve_named_yaml(
+        bootstrap.llm_config,
+        "llm_config",
+        root_dir=os.getcwd(),
+    )
 
     for label, raw, resolved in (
         ("default_config", bootstrap.default_config, default_path),
+        ("llm_config", bootstrap.llm_config, llm_path),
         ("dataset_config", bootstrap.dataset_config, dataset_path),
     ):
         if raw and resolved and not os.path.isfile(resolved):
             print(f"[evaluate] Warning: {label} not found: {resolved} (from {raw!r})")
 
     default_defaults = load_yaml(default_path)
+    llm_defaults = load_yaml(llm_path)
     dataset_defaults = load_yaml(dataset_path)
 
     runtime_config = _evaluate_base_config()
     runtime_config.update(
         {
             "default_config": bootstrap.default_config,
+            "llm_config": bootstrap.llm_config,
             "dataset_config": bootstrap.dataset_config,
         }
     )
     runtime_config.update(default_defaults)
+    runtime_config.update(llm_defaults)
     runtime_config.update(dataset_defaults)
 
-    ds_name = dataset_defaults.get("dataset_name")
-    ds_out_root = dataset_defaults.get("output_path")
-    if ds_name and ds_out_root:
-        runtime_config["output_path"] = os.path.join(ds_out_root, f"{ds_name}_output.json")
+    model_name = runtime_config.get("default_model")
+    if not model_name:
+        raise ValueError(
+            "default_model is required in llm_config for output_path derivation. "
+            "Set it in llm_config or override with Sacred, for example: with default_model='Qwen3-4B'"
+        )
+    runtime_config["output_path"] = derive_output_path(
+        current_output=runtime_config.get("output_path"),
+        dataset_name=runtime_config.get("dataset_name"),
+        use_tool=runtime_config.get("use_tool"),
+        model_name=model_name,
+    )
+
+    # tokenizer_path: only infer from llm_config.model_path when not explicitly provided
+    if not runtime_config.get("tokenizer_path"):
+        llm_model_path = llm_defaults.get("model_path")
+        if llm_model_path:
+            runtime_config["tokenizer_path"] = llm_model_path
 
     loaded_from = []
     if default_path and os.path.isfile(default_path):
         loaded_from.append(f"default={default_path}")
+    if llm_path and os.path.isfile(llm_path):
+        loaded_from.append(f"llm={llm_path}")
     if dataset_path and os.path.isfile(dataset_path):
         loaded_from.append(f"dataset={dataset_path}")
     if loaded_from:
@@ -301,6 +242,7 @@ def run_from_cli(argv: Optional[Sequence[str]] = None):
         description="Evaluation bootstrap options",
         options=(
             ("--default_config", {"type": str, "default": "default"}),
+            ("--llm_config", {"type": str, "default": None}),
             ("--dataset_config", {"type": str, "default": None}),
         ),
     )
@@ -313,10 +255,13 @@ def run_from_cli(argv: Optional[Sequence[str]] = None):
         return asyncio.run(main(dict(_config)))
 
     if getattr(bootstrap, "_show_help", False):
-        print("Bootstrap options: --default_config <name> --dataset_config <name>")
+        print(
+            "Bootstrap options: --default_config <name> --llm_config <name> "
+            "--dataset_config <name>"
+        )
         print(
             "Sacred overrides: python evaluate.py --dataset_config math500 "
-            "with output_path='results/math_output.json'"
+            "--llm_config Qwen3_4B with use_tool=true"
         )
 
     results = experiment.run_commandline(sacred_argv)
