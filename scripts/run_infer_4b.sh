@@ -9,7 +9,7 @@ set -euo pipefail
 # - use_tool=false
 #
 # infer.py is invoked in the recommended way:
-#   python infer.py --llm_config ... --dataset_config ...
+#   python infer.py --llm_config ... --dataset_config ... with ...
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -33,6 +33,13 @@ ENDPOINTS=(
   "http://127.0.0.1:8004/v1"
 )
 
+# Build Sacred-compatible Python list literal, e.g. ['http://...','http://...'].
+ENDPOINTS_EXPR="["
+for ep in "${ENDPOINTS[@]}"; do
+  ENDPOINTS_EXPR="${ENDPOINTS_EXPR}'${ep}',"
+done
+ENDPOINTS_EXPR="${ENDPOINTS_EXPR%?}]"
+
 echo "[run_infer_4b] Using LLM_CONFIG=$LLM_CONFIG"
 echo "[run_infer_4b] DATASET_NAMES=$DATASET_NAMES"
 echo "[run_infer_4b] Output path is inferred by infer.py (use_tool/model/dataset)."
@@ -46,8 +53,7 @@ for name in $DATASET_NAMES; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    --use_tool true \
-    --endpoints "${ENDPOINTS[@]}" 
+    with use_tool=true endpoints="$ENDPOINTS_EXPR"
 done
 
 for name in $DATASET_NAMES_NOTOOL; do
@@ -55,7 +61,6 @@ for name in $DATASET_NAMES_NOTOOL; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    --use_tool false \
-    --endpoints "${ENDPOINTS[@]}" \
+    with use_tool=false endpoints="$ENDPOINTS_EXPR" \
     2>/dev/null
 done

@@ -33,8 +33,7 @@ for name in $DATASET_NAMES; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    --use_tool true \
-    --model_path "$MODEL_PATH" 
+    with use_tool=true model_path="$MODEL_PATH"
 done
 
 for name in $DATASET_NAMES_NOTOOL; do
@@ -42,7 +41,6 @@ for name in $DATASET_NAMES_NOTOOL; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    --use_tool false \
-    --model_path "$MODEL_PATH" \
+    with use_tool=false model_path="$MODEL_PATH" \
     2>/dev/null
 done
