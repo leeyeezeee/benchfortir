@@ -1,0 +1,19 @@
+llm_name: qwen3_32b
+model_path: /data/lyz/models/Qwen3-32B
+default_model: Qwen3-32B
+max_tokens: 2048
+max_concurrent_requests: 8
+
+vllm:
+  remote: false
+  host: 0.0.0.0
+  port: 8001
+  gpu_ids: "0,1,2,3"
+  tensor_parallel_size: 4
+  max_model_len: 32768
+  gpu_memory_utilization: 0.9
+  max_logprobs: 100
+  extra_args:
+    - "--dtype=half"
+  endpoints: []
+  api_keys: []

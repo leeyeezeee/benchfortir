@@ -1,0 +1,5 @@
+dataset_name: math
+prompt_type: math
+sample_timeout: 1200
+task: math
+timeout: 18000

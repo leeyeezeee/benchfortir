@@ -1,0 +1,5 @@
+dataset_name: omini
+prompt_type: math
+sample_timeout: 2400
+task: math
+timeout: 18000

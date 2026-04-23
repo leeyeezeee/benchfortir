@@ -1,0 +1,21 @@
+
+llm_name: searchr1
+model_path: /data/lyz/models/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo-v0.2
+default_model: SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo-v0.2
+temperature: 1.0
+max_tokens: 3072
+top_p: 1.0
+
+vllm:
+  remote: false
+  host: 0.0.0.0
+  port: 8001
+  gpu_ids: "0,1"
+  tensor_parallel_size: 2
+  max_model_len: 32768
+  gpu_memory_utilization: 0.9
+  max_logprobs: 100
+  extra_args:
+    - "--dtype=half"
+  endpoints: []
+  api_keys: []

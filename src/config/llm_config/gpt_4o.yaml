@@ -1,0 +1,23 @@
+# OpenAI 远程 Chat API（OpenAI 兼容：AsyncOpenAI base_url + /v1）
+# 官方 URL：https://api.openai.com/v1
+# 也可用环境变量 OPENAI_BASE_URL / OPENAI_API_KEY 在 run_infer_gpt4o.sh 中覆盖
+
+llm_name: gpt4o
+default_model: gpt-4o
+
+temperature: 0.2
+max_tokens: 4096
+top_p: 0.95
+top_k: 20
+min_p: 0.0
+repetition_penalty: 1.1
+include_stop_str_in_output: True
+max_concurrent_requests: 8
+
+use_tool: true
+
+vllm:
+  remote: true
+  endpoints:
+    - https://halogg.cn/v1
+  api_keys: ["sk-H1Q8DMA2UV9BpcM2jhAdjU8dj2EG81K8GC0AfRvgoXpnNkG6"] # 建议在 shell 里用 --api_keys 传入，勿提交密钥

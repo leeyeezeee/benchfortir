@@ -1,0 +1,5 @@
+dataset_name: expodesign
+prompt_type: expodesign
+sample_timeout: 300
+task: expodesign
+timeout: 1800
