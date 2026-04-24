@@ -126,6 +126,8 @@ def _config_to_infer_defaults(c: dict) -> dict:
         "compatible_search": c.get("compatible_search", False),
         # Whether the model is allowed to call tools (tag-based protocols)
         "use_tool": c.get("use_tool", True),
+        # Local search post-process summarization (requires model_path for tokenizer when True)
+        "use_summarize": c.get("use_summarize", False),
         # Interaction (customer side) configuration
         "customer_api_key": c.get("customer_api_key"),
         "customer_base_url": c.get("customer_base_url"),
@@ -173,6 +175,7 @@ def _infer_base_config() -> dict:
         "sample_timeout": 120,
         "use_sds": False,
         "use_tool": True,
+        "use_summarize": False,
         "conda_path": None,
         "conda_env": None,
         "python_max_concurrent": 32,
@@ -300,6 +303,9 @@ def _normalize_infer_config(config: dict):
     config["remote"] = _coerce_bool(config.get("remote"))
     if config["remote"] is None:
         config["remote"] = False
+    config["use_summarize"] = _coerce_bool(config.get("use_summarize"))
+    if config["use_summarize"] is None:
+        config["use_summarize"]=False
     if config.get("endpoints") is not None and not isinstance(config["endpoints"], list):
         config["endpoints"] = [config["endpoints"]]
     if config.get("api_keys") is not None and not isinstance(config["api_keys"], list):
@@ -315,10 +321,13 @@ def _normalize_infer_config(config: dict):
             "Use YAML defaults or Sacred override: with endpoints=['http://host:8001/v1']"
         )
     if not config.get("model_path"):
-        raise ValueError(
-            "model_path is required when not set in llm_config. "
-            "Use YAML defaults or Sacred override: with model_path='/path/to/model'"
-        )
+        if not (config.get("remote") and not config.get("use_summarize")):
+            raise ValueError(
+                "model_path is required when not set in llm_config, unless "
+                "remote=True and use_summarize=False. "
+                "Use YAML or Sacred: with model_path='/path/to/model' "
+                "or with remote=True use_summarize=False"
+            )
 
     return dict_to_namespace(config)
 

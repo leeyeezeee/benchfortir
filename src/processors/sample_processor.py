@@ -85,9 +85,18 @@ class SampleProcessor:
         self.in_context += content
 
     def process_input(self):
-        self.in_context = self.tokenizer.apply_chat_template(
-            self.messages, tokenize=False, add_generation_prompt=True
-        )
+        if self.tokenizer is not None:
+            self.in_context = self.tokenizer.apply_chat_template(
+                self.messages, tokenize=False, add_generation_prompt=True
+            )
+            return
+        if not getattr(self.args, "remote", False):
+            raise RuntimeError(
+                "model_path / tokenizer is required when remote=False "
+                "(load AutoTokenizer from model_path, or set remote=True)."
+            )
+        parts = []
+        self.in_context = "\n\n".join(parts)
 
     async def call_local_llm(self, stop) -> str:
         in_context = self.in_context

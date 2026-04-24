@@ -43,17 +43,38 @@ class AsyncInference:
         )
 
         self.prompt_manager = PromptManager(args.prompt_type, args.use_tool)
-        # 加载分词器
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            args.model_path, trust_remote_code=True
-        )
-        # 先初始化summarize_tool
-        self.summarize_tool = SummarizeTool(
-            summ_model_urls=args.summ_model_urls,
-            summ_model_path=args.summ_model_path,
-            summ_model_name=args.summ_model_name,
-            tokenizer=self.tokenizer,
-        )
+        use_summarize = bool(getattr(args, "use_summarize", False))
+        self._use_summarize = use_summarize
+        remote = bool(getattr(args, "remote", False))
+        model_path = getattr(args, "model_path", None) or None
+        can_omit_model_path = remote and not use_summarize
+
+        if model_path:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_path, trust_remote_code=True
+            )
+        elif can_omit_model_path:
+            self.tokenizer = None
+        else:
+            raise ValueError(
+                "model_path is required unless remote=True and use_summarize=False "
+                "(use_summarize defaults to False when omitted)."
+            )
+
+        if use_summarize:
+            if self.tokenizer is None:
+                raise ValueError(
+                    "use_summarize=True requires model_path to load the tokenizer "
+                    "used by SummarizeTool."
+                )
+            self.summarize_tool = SummarizeTool(
+                summ_model_urls=args.summ_model_urls,
+                summ_model_path=args.summ_model_path,
+                summ_model_name=args.summ_model_name,
+                tokenizer=self.tokenizer,
+            )
+        else:
+            self.summarize_tool = None
         # 然后初始化工具执行器（如Python、搜索等工具）
         self.tool_executor = self._create_tool_executor()
         # 构建数据加载器列表，每个数据集一个DataLoader
@@ -138,7 +159,7 @@ class AsyncInference:
                     local_search_url=self.args.local_search_url,
                     max_results=self.args.search_max_results,
                     summarize_tool=self.summarize_tool,
-                    use_summarize=False
+                    use_summarize=self._use_summarize,
                 )
                 tool_executor.register_tool(self.search_tool)
             else:
@@ -158,7 +179,7 @@ class AsyncInference:
                 local_search_url=self.args.local_search_url,
                 max_results=self.args.search_max_results,
                 summarize_tool=self.summarize_tool,
-                use_summarize=False
+                use_summarize=self._use_summarize,
             )
             tool_executor.register_tool(local_search_tool)
             web_search_tool = BingSearchTool(
@@ -382,6 +403,7 @@ class AsyncInferenceCompletionSDS(AsyncInference):
                     local_search_url=self.args.local_search_url,
                     max_results=self.args.search_max_results,
                     summarize_tool=self.summarize_tool,
+                    use_summarize=self._use_summarize,
                 )
                 tool_executor.register_tool(search_tool)
             # 注册SDS搜索工具
@@ -407,6 +429,7 @@ class AsyncInferenceCompletionSDS(AsyncInference):
                 local_search_url=self.args.local_search_url,
                 max_results=self.args.search_max_results,
                 summarize_tool=self.summarize_tool,
+                use_summarize=self._use_summarize,
             )
             tool_executor.register_tool(local_search_tool)
             web_search_tool = BingSearchToolSDS(

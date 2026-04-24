@@ -61,6 +61,9 @@ class AsyncInteractionInference:
     """
     Interaction (Task1) inference engine.
 
+    When running via infer.py with remote=True and use_summarize=False (the default),
+    model_path may be omitted; this engine does not load a local HF tokenizer.
+
     Pipeline:
       1) Use InteractionDataLoader to load scenario templates from JSONL.
       2) For each scenario, use SampleProcessorInter to run a full agent↔customer dialogue:

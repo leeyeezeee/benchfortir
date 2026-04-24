@@ -339,7 +339,6 @@ class PromptManager:
         # 这里允许使用 {category}/{title}/... 这种占位符，推理阶段可通过 str.format(**scenario_dict) 填充。
 
         # expodesign: 实验设计任务，支持标签式工具调用（<python>/<search>/<result>/<answer>）
-        # 输入：用户消息中论文信息以标签包裹，见下方说明
         if self.prompt_type == "expodesign":
             if self.use_tool:
                 # 标签模式：模型通过 <python>/<search> 请求工具，系统在 <result> 中返回结果；
@@ -347,12 +346,9 @@ class PromptManager:
                 return (
                     "You are an expert research engineer. Given a paper and a research problem statement, "
                     "you must produce a minimal, runnable experiment design and implementation plan.\n\n"
-                    "Input format: The user message contains the paper information in tagged form. "
+                    "Input format: The user message may contain paper information in tagged form. "
                     "Use these fields when designing your experiment:\n"
                     "- The domain is between <domain> and </domain>.\n"
-                    "- The paper title is between <title> and </title>.\n"
-                    "- The URL is between <url> and </url>.\n"
-                    "- The abstract is between <abstract> and </abstract>.\n"
                     "- If present, extra extracted text is between <extra_text> and </extra_text>.\n\n"
                     f"{EXPO_DESIGN_TOOL_PROTOCOL}\n\n"
                     f"{EXPO_DESIGN_JSON_SCHEMA}"
@@ -362,12 +358,9 @@ class PromptManager:
                 return (
                     "You are an expert research engineer. Given a paper and a research problem statement, "
                     "you must produce a minimal, runnable experiment design and implementation plan.\n\n"
-                    "Input format: The user message contains the paper information in tagged form. "
+                    "Input format: The user message may contain paper information in tagged form. "
                     "Use these fields when designing your experiment:\n"
                     "- The domain is between <domain> and </domain>.\n"
-                    "- The paper title is between <title> and </title>.\n"
-                    "- The URL is between <url> and </url>.\n"
-                    "- The abstract is between <abstract> and </abstract>.\n"
                     "- If present, extra extracted text is between <extra_text> and </extra_text>.\n\n"
                     "You must reason step by step and rely only on the information provided in the paper and your general knowledge; "
                     "do NOT call any external tools such as web search or code execution, and do NOT emit any <python>, <search>, or <result> tags. "
