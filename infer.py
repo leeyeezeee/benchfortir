@@ -348,9 +348,10 @@ def get_inference_instance(config: dict):
             from src.infer_engines.inference_engine_inter import (
                 AsyncInteractionInference as AsyncInfer,
             )
+            return AsyncInfer(args)
         except ImportError:
             print("ImportError: No module named 'src.infer_engines.inference_engine_inter'")
-        return AsyncInfer(args)
+        
 
     # Default math/QA inference engines
     try:
@@ -358,12 +359,11 @@ def get_inference_instance(config: dict):
             from src.infer_engines.inference_engine import AsyncInferenceCompletionSDS as AsyncInfer
         else:
             from src.infer_engines.inference_engine import AsyncInference as AsyncInfer
+        return AsyncInfer(args)
     except ImportError:
         print("ImportError: No module named 'src.infer_engines.inference_engine'")
 
-    return AsyncInfer(args)
-
-
+    
 async def main(config: dict):
     inference = get_inference_instance(config)
     await inference.run()
@@ -392,7 +392,7 @@ def run_from_cli(argv: Optional[Sequence[str]] = None):
             "Sacred overrides: python infer.py --llm_config Qwen3_8B "
             "--dataset_config math500 with counts=10 temperature=0.2"
         )
-
+    print(sacred_argv)
     return experiment.run_commandline(sacred_argv)
 
 
