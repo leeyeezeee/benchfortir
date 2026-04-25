@@ -411,7 +411,7 @@ class Evaluator:
         prediction = item.get("prediction", "")
         output = item.get("output", "")
         instruction = item.get("instruction", "")
-
+        
         # Fallback: extract final answer from output if prediction is missing
         if (not prediction) and output:
             try:
@@ -482,11 +482,13 @@ class Evaluator:
             score_for_eff = 0.0
             if self.use_llm and self.llm_evaluator:
                 semaphore = asyncio.Semaphore(self.concurrent_limit)
+                meta = item.get("meta", "")
                 is_correct, llm_reason_answer = await self.llm_evaluator.evaluate(
                     question=question,
                     labeled_answer=answer,
                     pred_answer=prediction,
                     semaphore=semaphore,
+                    meta=meta,
                 )
                 metrics["llm_equal"] = int(is_correct)
                 metrics["llm_response"] = llm_reason_answer

@@ -145,19 +145,6 @@ def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
     runtime_config.update(llm_defaults)
     runtime_config.update(dataset_defaults)
 
-    model_name = runtime_config.get("default_model")
-    if not model_name:
-        raise ValueError(
-            "default_model is required in llm_config for output_path derivation. "
-            "Set it in llm_config or override with Sacred, for example: with default_model='Qwen3-4B'"
-        )
-    runtime_config["output_path"] = derive_output_path(
-        current_output=runtime_config.get("output_path"),
-        dataset_name=runtime_config.get("dataset_name"),
-        use_tool=runtime_config.get("use_tool"),
-        model_name=model_name,
-    )
-
     # tokenizer_path: only infer from llm_config.model_path when not explicitly provided
     if not runtime_config.get("tokenizer_path"):
         llm_model_path = llm_defaults.get("model_path")
@@ -181,6 +168,19 @@ def _normalize_eval_config(config: dict):
     config["use_llm"] = _coerce_bool(config.get("use_llm"))
     if config["use_llm"] is None:
         config["use_llm"] = False
+
+    model_name = config.get("default_model")
+    if not model_name:
+        raise ValueError(
+            "default_model is required in llm_config for output_path derivation. "
+            "Set it in llm_config or override with Sacred, for example: with default_model='Qwen3-4B'"
+        )
+    config["output_path"] = derive_output_path(
+        current_output=config.get("output_path"),
+        dataset_name=config.get("dataset_name"),
+        use_tool=config.get("use_tool"),
+        model_name=model_name,
+    )
 
     if not config.get("task"):
         raise ValueError(

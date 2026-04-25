@@ -270,18 +270,6 @@ def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
         dataset_config_path=dataset_resolved,
     )
     runtime_config.update(defaults)
-    model_name = runtime_config.get("default_model")
-    if not model_name:
-        raise ValueError(
-            "default_model is required in llm_config for output_path derivation. "
-            "Set it in llm_config or override with Sacred, for example: with default_model='Qwen3-4B'"
-        )
-    runtime_config["output_path"] = derive_output_path(
-        current_output=runtime_config.get("output_path"),
-        dataset_name=runtime_config.get("dataset_name"),
-        use_tool=runtime_config.get("use_tool"),
-        model_name=model_name,
-    )
 
     loaded_from = []
     if default_resolved and os.path.isfile(default_resolved):
@@ -314,6 +302,19 @@ def _normalize_infer_config(config: dict):
         config["summ_model_urls"] = [config["summ_model_urls"]]
     if config.get("read_allowed_roots") is not None and not isinstance(config["read_allowed_roots"], list):
         config["read_allowed_roots"] = [config["read_allowed_roots"]]
+
+    model_name = config.get("default_model")
+    if not model_name:
+        raise ValueError(
+            "default_model is required in llm_config for output_path derivation. "
+            "Set it in llm_config or override with Sacred, for example: with default_model='Qwen3-4B'"
+        )
+    config["output_path"] = derive_output_path(
+        current_output=config.get("output_path"),
+        dataset_name=config.get("dataset_name"),
+        use_tool=config.get("use_tool"),
+        model_name=model_name,
+    )
 
     if not config.get("endpoints"):
         raise ValueError(

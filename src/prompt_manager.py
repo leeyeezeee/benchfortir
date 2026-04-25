@@ -344,25 +344,27 @@ class PromptManager:
                 # 标签模式：模型通过 <python>/<search> 请求工具，系统在 <result> 中返回结果；
                 # 最终实验卡 JSON 必须放在 <answer>...</answer> 中，且不包含 runnable_code 字段。
                 return (
-                    "You are an expert research engineer. Given a paper and a research problem statement, "
+                    "You are an expert research engineer. Given a research task specification, "
                     "you must produce a minimal, runnable experiment design and implementation plan.\n\n"
-                    "Input format: The user message may contain paper information in tagged form. "
-                    "Use these fields when designing your experiment:\n"
-                    "- The domain is between <domain> and </domain>.\n"
-                    "- If present, extra extracted text is between <extra_text> and </extra_text>.\n\n"
+                    "Input format: The user message is a tagged research task. Read and follow at least:\n"
+                    "- <task_type>...</task_type>\n"
+                    "- <problem_statement>...</problem_statement>\n"
+                    "- <required_model_output>...</required_model_output> (checklist; align your plan and <answer> JSON to it where applicable)\n"
+                    "- <evaluation_notes>...</evaluation_notes> (rubric; satisfy when designing and analyzing)\n\n"
                     f"{EXPO_DESIGN_TOOL_PROTOCOL}\n\n"
                     f"{EXPO_DESIGN_JSON_SCHEMA}"
                 )
             else:
                 # 无工具版：保留 JSON schema 和 <answer> 要求，但不再允许 <python>/<search>/<result> 标签。
                 return (
-                    "You are an expert research engineer. Given a paper and a research problem statement, "
+                    "You are an expert research engineer. Given a research task specification, "
                     "you must produce a minimal, runnable experiment design and implementation plan.\n\n"
-                    "Input format: The user message may contain paper information in tagged form. "
-                    "Use these fields when designing your experiment:\n"
-                    "- The domain is between <domain> and </domain>.\n"
-                    "- If present, extra extracted text is between <extra_text> and </extra_text>.\n\n"
-                    "You must reason step by step and rely only on the information provided in the paper and your general knowledge; "
+                    "Input format: The user message is a tagged research task. Read and follow at least:\n"
+                    "- <task_type>...</task_type>\n"
+                    "- <problem_statement>...</problem_statement>\n"
+                    "- <required_model_output>...</required_model_output>\n"
+                    "- <evaluation_notes>...</evaluation_notes>\n\n"
+                    "You must reason step by step using the task, your general knowledge, and (if the task implies) domain-appropriate context; "
                     "do NOT call any external tools such as web search or code execution, and do NOT emit any <python>, <search>, or <result> tags. "
                     "After your reasoning, you MUST output a final experiment card as JSON inside <answer> and </answer>, "
                     "with exactly the following schema (no runnable_code field and no extra keys):\n\n"

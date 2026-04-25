@@ -216,6 +216,7 @@ class AsyncInference:
         choice: str,
         format: str,
         session_id: Optional[str] = None,
+        meta: Optional[str] = None,
     ) -> Dict[str, Any]:
         # 构造样本状态字典
         sample_stat = {
@@ -229,6 +230,8 @@ class AsyncInference:
             "logs": [],
             "search_query_history": set(),
         }
+        if meta:
+            sample_stat["meta"] = meta
 
         # 记录当前任务的中间结果，便于超时后获取
         current_task = asyncio.current_task()
@@ -244,11 +247,21 @@ class AsyncInference:
 
     # 包装样本处理，增加超时和异常处理
     async def process_sample_wrap(
-        self, idx, question, answer: Union[str, List[str]], choice, format
+        self,
+        idx,
+        question,
+        answer: Union[str, List[str]],
+        choice,
+        format,
+        meta: Optional[str] = None,
     ):
         try:
             # 创建异步任务
-            process_task = asyncio.create_task(self.process_sample(question, answer, choice, format))
+            process_task = asyncio.create_task(
+                self.process_sample(
+                    question, answer, choice, format, session_id=None, meta=meta
+                )
+            )
             try:
                 # 等待任务完成，超时则抛出TimeoutError
                 result = await asyncio.wait_for(
@@ -279,6 +292,8 @@ class AsyncInference:
                     "logs": [],
                     "search_query_history": set(),
                 }
+                if meta:
+                    result["meta"] = meta
         except Exception as e:
             # 其他异常处理
             import traceback
@@ -295,8 +310,12 @@ class AsyncInference:
                 "logs": [],
                 "search_query_history": set(),
             }
+            if meta:
+                result["meta"] = meta
         # 将搜索历史集合转为列表，便于序列化
         result["search_query_history"] = list(result["search_query_history"])
+        if meta and "meta" not in result:
+            result["meta"] = meta
         return result
 
     # # 单轮推理接口（输入即问题，输出为推理结果）
@@ -304,15 +323,19 @@ class AsyncInference:
     #     return await self.process_sample_wrap(question, question, None, None, None)
 
     # 异步任务worker，不断从队列取任务并处理
-    async def task_worker(self, task_queue, questions, answers, results, choices, formats):
+    async def task_worker(self, task_queue, questions, answers, results, choices, formats, metas):
         while not task_queue.empty():
             try:
                 idx = await task_queue.get()
-                
-                
+
                 # 执行单次采样
                 results[idx] = await self.process_sample_wrap(
-                    idx, questions[idx], answers[idx], choices[idx], formats[idx]
+                    idx,
+                    questions[idx],
+                    answers[idx],
+                    choices[idx],
+                    formats[idx],
+                    meta=metas[idx],
                 )
                 
                 # 将采样结果添加到对应样本的结果列表中
@@ -331,7 +354,7 @@ class AsyncInference:
         )
         # 加载问题和答案
         self.source_datas = self.data_loader.load_data()
-        questions, answers, choices, formats = self.source_datas
+        questions, answers, choices, formats, metas = self.source_datas
         # 只取前counts个样本
         total_examples = min(len(questions), self.args.counts)
         print(
@@ -349,7 +372,9 @@ class AsyncInference:
         for _ in range(min(self.args.max_concurrent_requests, total_examples)):
             workers.append(
                 asyncio.create_task(
-                    self.task_worker(task_queue, questions, answers, results, choices, formats)
+                    self.task_worker(
+                        task_queue, questions, answers, results, choices, formats, metas
+                    )
                 )
             )
         # 进度条显示

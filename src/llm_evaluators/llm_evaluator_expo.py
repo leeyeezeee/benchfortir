@@ -2,8 +2,9 @@
 LLM-as-judge evaluator for expodesign (experiment design) task.
 Uses rubric-based scoring (scores 1-5, overall_score, rationales) aligned with
 crawler/Scientific_Claim_Refutation/llm_as_judge.py. Expects <answer> content to be
-parseable JSON (experiment card); builds judge prompt from tag-wrapped question
-(<domain>, <title>, <url>, <abstract>) and candidate answer JSON.
+parseable JSON (experiment card); builds judge prompt from tag-wrapped paper ``meta``
+(<domain>, <title>, <url>, <abstract>), the task query string, and candidate answer JSON.
+When ``meta`` is absent, falls back to legacy single-string question for paper tags.
 """
 import asyncio
 import json
@@ -121,7 +122,7 @@ class LLMEvaluatorExpo:
     """
     LLM-as-judge evaluator for expodesign task.
     Interface compatible with LLMEvaluator: evaluate(question, labeled_answer, pred_answer, semaphore) -> (bool, str).
-    question: tag-wrapped input (<domain>, <title>, <url>, <abstract>).
+    question: task / user input string (e.g. tagged task). Use ``meta`` for paper tags when set.
     pred_answer: content inside <answer>, expected to be parseable JSON (experiment card).
     Returns (is_correct, response_str); response_str is JSON string of judge output (scores, overall_score, rationales, flags).
     """
@@ -158,25 +159,27 @@ class LLMEvaluatorExpo:
         labeled_answer: str,
         pred_answer: str,
         semaphore: asyncio.Semaphore,
+        meta: Optional[str] = None,
     ) -> Tuple[bool, str]:
         """
         Evaluate one expodesign prediction.
 
         Args:
-            question: Tag-wrapped paper info (<domain>, <title>, <url>, <abstract>).
+            question: When ``meta`` is set, the task / user input (e.g. tagged task prompt). Otherwise legacy combined input.
             labeled_answer: Unused for expo (no gold answer); kept for interface compatibility.
             pred_answer: Content of <answer>, expected to be parseable JSON (experiment card).
             semaphore: Concurrency limit.
+            meta: Optional tag-wrapped paper info (<domain>, <title>, <url>, <abstract>); when provided, used for paper fields for the judge.
 
         Returns:
             (is_correct, response_str): is_correct from overall_score >= threshold;
             response_str is JSON string of judge output for downstream metrics.
         """
         paper = {
-            "title": _extract_tag(question, "title"),
-            "abstract": _extract_tag(question, "abstract"),
-            "url": _extract_tag(question, "url"),
-            "domain": _extract_tag(question, "domain"),
+            "title": _extract_tag(meta, "title"),
+            "abstract": _extract_tag(meta, "abstract"),
+            "url": _extract_tag(meta, "url"),
+            "domain": _extract_tag(meta, "domain"),
         }
         answer_payload = _parse_prediction_as_json(pred_answer)
         query = _safe_clip(question, 1200)

@@ -25,18 +25,26 @@ class DataLoader:
 
     def load_data(
         self,
-    ) -> Tuple[List[str], List[Union[str, List[str]]], List[List[str]], List[str]]:
+    ) -> Tuple[
+        List[str],
+        List[Union[str, List[str]]],
+        List[List[str]],
+        List[str],
+        List[str],
+    ]:
         """
         Load dataset
 
         Returns:
-            (questions, answers, choices, formats)
+            (questions, answers, choices, formats, metas)
             answers 每项通常为 str；squadv2 可答题为 List[str]（多参考 span 去重后的文本，供 max EM/F1）。
+            metas: expodesign 时与 test.jsonl 的 ``meta`` 字段一致（论文元信息）；其它数据集为与样本等长的空字符串。
         """
         questions = []
         answers = []
         choices = []
         formats = []
+        metas: List[str] = []
 
         print(f"Loading dataset from {self.data_path}")
 
@@ -132,6 +140,14 @@ class DataLoader:
                     answers.append(data["answer"])
                     choices.append(data['options'])
                     formats.append("Multiple-choice")
+        elif self.dataset_name == "expodesign":
+            # 仅依赖 data/<dataset>/test.jsonl：推理输入为 question，评测用 meta；不在此拼接或从 task_prompt 构造。
+            with open(self.data_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    data = json.loads(line)
+                    questions.append(data["question"])
+                    answers.append(data.get("answer", ""))
+                    metas.append(data.get("meta", "") or "")
         elif self.dataset_name.lower() == "simpleqa":
             with open(self.data_path, "r", encoding="utf-8") as f:
                 for line in f:
@@ -194,10 +210,13 @@ class DataLoader:
             choices = [[]] * len(questions)
         if len(formats) == 0:
             formats = [None] * len(questions)
+        if len(metas) != len(questions):
+            metas = [""] * len(questions)
 
         print(f"Loading {len(questions)} samples from {self.data_path}...")
         questions = questions[:self.counts]
         answers = answers[:self.counts]
         choices = choices[:self.counts]
         formats = formats[:self.counts]
-        return questions, answers, choices, formats
+        metas = metas[: self.counts]
+        return questions, answers, choices, formats, metas
