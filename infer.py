@@ -398,7 +398,7 @@ def run_from_cli(argv: Optional[Sequence[str]] = None):
             "Sacred overrides: python infer.py --llm_config Qwen3_8B "
             "--dataset_config math500 with counts=10 temperature=0.2"
         )
-    return experiment.run_commandline(sacred_argv)
+    return experiment.run_commandline([sys.argv[0], *sacred_argv])
 
 
 if __name__ == "__main__":

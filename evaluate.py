@@ -264,7 +264,7 @@ def run_from_cli(argv: Optional[Sequence[str]] = None):
             "--llm_config Qwen3_4B with use_tool=true"
         )
 
-    results = experiment.run_commandline(sacred_argv)
+    results = experiment.run_commandline([sys.argv[0], *sacred_argv])
     return results.result
 
 
