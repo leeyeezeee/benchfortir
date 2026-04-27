@@ -236,6 +236,8 @@ def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
             ("--print_keys", {"action": "store_true", "default": False}),
         ),
     )
+    print(f"[infer][debug] bootstrap_args={vars(bootstrap)}")
+    print(f"[infer][debug] sacred_argv_after_bootstrap={sacred_argv}")
 
     default_resolved = resolve_named_yaml(
         bootstrap.default_config,
@@ -372,12 +374,15 @@ async def main(config: dict):
 
 def run_from_cli(argv: Optional[Sequence[str]] = None):
     cli_args = list(argv if argv is not None else sys.argv[1:])
+    print(f"[infer][debug] raw_cli_args={cli_args}")
     base_config, sacred_argv = _build_runtime_config(cli_args)
+    print(f"[infer][debug] sacred_argv_before_run={sacred_argv}")
 
     experiment = build_experiment("evaluation_infer", base_config)
 
     @experiment.main
     def infer_entry(_config):
+        print(f"[infer][debug] sacred_merged_config={dict(_config)}")
         return asyncio.run(main(dict(_config)))
 
     if getattr(parse_bootstrap_args(
