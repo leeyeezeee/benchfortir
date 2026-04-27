@@ -14,5 +14,5 @@ vllm:
   max_logprobs: 100
   extra_args:
     - "--dtype=half"
-  endpoints: []
+  endpoints: ["http://127.0.0.1:8001/v1"]
   api_keys: []
