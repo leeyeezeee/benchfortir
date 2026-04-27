@@ -9,9 +9,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 LLM_CONFIG="${LLM_CONFIG:-src/config/llm_config/Qwen3_4B.yaml}"
-export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"
 
-echo "[start_vllm] Using config: ${LLM_CONFIG} VLLM_TOTAL_GPUS=${VLLM_TOTAL_GPUS}"
+echo "[start_vllm] Using config: ${LLM_CONFIG}
 
 python deploy.py \
   --config "$LLM_CONFIG" \

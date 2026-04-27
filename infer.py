@@ -63,14 +63,18 @@ def _config_to_infer_defaults(c: dict) -> dict:
     """将合并后的 YAML 字典映射为 infer 命令行参数字典（用于 defaults）。"""
     vllm = c.get("vllm") or {}
     remote = vllm.get("remote", False)
-    if remote:
-        endpoints = vllm.get("endpoints") or []
-        api_keys = vllm.get("api_keys") or []
-    else:
+    endpoints = vllm.get("endpoints") or []
+    if not endpoints and not remote:
         host = vllm.get("host", "0.0.0.0")
-        port = vllm.get("port", 8001)
-        endpoints = [f"http://{host}:{port}/v1"] if host and port else []
-        api_keys = vllm.get("api_keys") or []
+        base_port = int(vllm.get("port", 8001))
+        gpu_ids = vllm.get("gpu_ids")
+        if isinstance(gpu_ids, list):
+            instance_count = len(gpu_ids)
+        else:
+            instance_count = 1
+        instance_count = max(1, instance_count)
+        endpoints = [f"http://{host}:{base_port + i}/v1" for i in range(instance_count)]
+    api_keys = vllm.get("api_keys") or []
 
     def _list_or_none(x):
         if x is None:
@@ -134,10 +138,10 @@ def _config_to_infer_defaults(c: dict) -> dict:
         "customer_model": c.get("customer_model", "kimi-k2-0905-preview"),
         "customer_temperature": c.get("customer_temperature", 0.2),
         "customer_max_tokens": c.get("customer_max_tokens", 2048),
+        "customer_retry_limit": c.get("customer_retry_limit", 5),
+        "customer_retry_backoff_base": c.get("customer_retry_backoff_base", 1.0),
         "max_turns": c.get("max_turns", 10),
-        # Interaction scenario JSONL（见 data_loader_inter._resolve_interaction_jsonl_path）
-        "inter_filename": c.get("inter_filename"),
-        "inter_data_path": c.get("inter_data_path"),
+        "max_tool_iters": c.get("max_tool_iters", 6),
     }
     if isinstance(c.get("summ_model_urls"), list):
         defaults["summ_model_urls"] = c["summ_model_urls"]
@@ -204,9 +208,10 @@ def _infer_base_config() -> dict:
         "customer_model": "kimi-k2-0905-preview",
         "customer_temperature": 0.2,
         "customer_max_tokens": 2048,
+        "customer_retry_limit": 5,
+        "customer_retry_backoff_base": 1.0,
         "max_turns": 10,
-        "inter_filename": None,
-        "inter_data_path": None,
+        "max_tool_iters": 6,
     }
 
 
@@ -236,9 +241,6 @@ def _build_runtime_config(argv: Sequence[str]) -> tuple[dict, list[str]]:
             ("--print_keys", {"action": "store_true", "default": False}),
         ),
     )
-    print(f"[infer][debug] bootstrap_args={vars(bootstrap)}")
-    print(f"[infer][debug] sacred_argv_after_bootstrap={sacred_argv}")
-
     default_resolved = resolve_named_yaml(
         bootstrap.default_config,
         "",
@@ -374,15 +376,12 @@ async def main(config: dict):
 
 def run_from_cli(argv: Optional[Sequence[str]] = None):
     cli_args = list(argv if argv is not None else sys.argv[1:])
-    print(f"[infer][debug] raw_cli_args={cli_args}")
     base_config, sacred_argv = _build_runtime_config(cli_args)
-    print(f"[infer][debug] sacred_argv_before_run={sacred_argv}")
 
     experiment = build_experiment("evaluation_infer", base_config)
 
     @experiment.main
     def infer_entry(_config):
-        print(f"[infer][debug] sacred_merged_config={dict(_config)}")
         return asyncio.run(main(dict(_config)))
 
     if getattr(parse_bootstrap_args(

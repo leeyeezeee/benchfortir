@@ -28,9 +28,6 @@ if [ -n "${VLLM_BASE_PORT:-}" ]; then
 fi
 ENDPOINTS=(
   "http://127.0.0.1:8001/v1"
-  "http://127.0.0.1:8002/v1"
-  "http://127.0.0.1:8003/v1"
-  "http://127.0.0.1:8004/v1"
 )
 
 # Build Sacred-compatible Python list literal, e.g. ['http://...','http://...'].

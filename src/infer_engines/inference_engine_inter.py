@@ -27,14 +27,8 @@ from ..tools.interaction_tools import (
 from ..data_loaders.data_loader_inter import InteractionDataLoader
 from ..processors.sample_processor_inter import SampleProcessorInter
 
-# Customer (simulated user) OpenAI-compatible API — used when args / YAML omit values.
-_DEFAULT_CUSTOMER_BASE_URL = "https://api.moonshot.cn/v1"
-# Prefer env; last resort matches previous getattr default so merged YAML `null` does not break runs.
-_DEFAULT_CUSTOMER_API_KEY = "sk-IvXK1GcIhwXbaCm62ceqcsUVB1qNbB8upHnhzOOgGVgd5Txq"
-
-
 def _resolve_customer_credentials(args: Any) -> Tuple[str, str]:
-    """Args may set customer_* to None after YAML merge; treat as unset and fall back."""
+    """Resolve customer credentials from merged config args."""
     raw_key = getattr(args, "customer_api_key", None)
     raw_url = getattr(args, "customer_base_url", None)
     if isinstance(raw_key, str):
@@ -42,18 +36,10 @@ def _resolve_customer_credentials(args: Any) -> Tuple[str, str]:
     if isinstance(raw_url, str):
         raw_url = raw_url.strip() or None
 
-    api_key = (
-        raw_key
-        or os.environ.get("MOONSHOT_API_KEY")
-        or os.environ.get("CUSTOMER_API_KEY")
-        or _DEFAULT_CUSTOMER_API_KEY
-    )
-    base_url = (
-        raw_url
-        or os.environ.get("MOONSHOT_BASE_URL")
-        or os.environ.get("CUSTOMER_BASE_URL")
-        or _DEFAULT_CUSTOMER_BASE_URL
-    )
+    # API key must come from config (YAML/Sacred/CLI merged into args).
+    api_key = raw_key
+    # Base URL must come from config (YAML/Sacred/CLI merged into args).
+    base_url = raw_url
     return api_key, base_url
 
 
@@ -110,7 +96,7 @@ class AsyncInteractionInference:
         if not customer_api_key or not customer_base_url:
             raise RuntimeError(
                 "customer_api_key and customer_base_url are empty after resolving "
-                "(set in YAML/CLI, or MOONSHOT_API_KEY / MOONSHOT_BASE_URL env)."
+                "(set both in config/YAML or pass via Sacred overrides)."
             )
         self.customer_client = OpenAI(api_key=customer_api_key, base_url=customer_base_url)
         self.customer_model = getattr(args, "customer_model", "kimi-k2-0905-preview")

@@ -2,7 +2,7 @@
 # 官方 URL：https://api.openai.com/v1
 
 llm_name: gpt5
-default_model: gpt-5.1
+default_model: gpt-5
 
 temperature: 0.2
 max_tokens: 4096

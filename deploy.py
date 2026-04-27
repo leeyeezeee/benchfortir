@@ -54,6 +54,46 @@ def load_config(path: str) -> Dict[str, Any]:
         return yaml.safe_load(f) or {}
 
 
+def resolve_llm_config_path(raw: str) -> str:
+    """
+    Resolve --config input to an existing llm_config YAML path.
+
+    Supported input styles:
+    - explicit path (absolute/relative), e.g. src/config/llm_config/Qwen3_4B.yaml
+    - stem name without extension/path, e.g. Qwen3_4B
+
+    Not supported intentionally:
+    - bare filename with extension but no path, e.g. Qwen3_4B.yaml
+    """
+    value = str(raw or "").strip()
+    if not value:
+        raise ValueError("--config 不能为空")
+
+    # Explicit path style: contains path separator or is absolute path.
+    if os.path.isabs(value) or "/" in value or "\\" in value:
+        resolved = value if os.path.isabs(value) else os.path.normpath(os.path.join(os.getcwd(), value))
+        if not os.path.isfile(resolved):
+            raise FileNotFoundError(f"配置文件不存在: {resolved}")
+        return resolved
+
+    # By request, do not support bare filename with extension.
+    lowered = value.lower()
+    if lowered.endswith(".yaml") or lowered.endswith(".yml"):
+        raise ValueError(
+            f"不支持仅文件名后缀写法: {value!r}。"
+            "请改用配置 stem（如 Qwen3_4B）或显式路径（如 src/config/llm_config/Qwen3_4B.yaml）。"
+        )
+
+    cfg_dir = os.path.join(os.getcwd(), "src", "config", "llm_config")
+    for ext in (".yaml", ".yml"):
+        candidate = os.path.join(cfg_dir, value + ext)
+        if os.path.isfile(candidate):
+            return candidate
+    raise FileNotFoundError(
+        f"未找到 llm_config: {value!r}（已尝试: {os.path.join(cfg_dir, value + '.yaml')} / .yml）"
+    )
+
+
 def gpus_per_instance(config: Dict[str, Any]) -> int:
     """每个实例需要的 GPU 数：以 vllm.tensor_parallel_size 为准。"""
     vllm_cfg = config.get("vllm", {}) or {}
@@ -228,14 +268,15 @@ def parse_args():
         "--config",
         type=str,
         required=True,
-        help="路径：llm_config 配置文件",
+        help="llm_config 路径，或配置 stem（如 Qwen3_4B）",
     )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    deploy_vllm_multi(args.config)
+    config_path = resolve_llm_config_path(args.config)
+    deploy_vllm_multi(config_path)
 
 
 if __name__ == "__main__":

@@ -4,3 +4,12 @@ sample_timeout: 600
 max_turns: 10
 task: interaction
 timeout: 1800
+# Interaction task configuration
+customer_api_key: sk-IvXK1GcIhwXbaCm62ceqcsUVB1qNbB8upHnhzOOgGVgd5Txq
+customer_base_url: https://api.moonshot.cn/v1
+customer_model: kimi-k2-0905-preview
+customer_temperature: 0.2
+customer_max_tokens: 2048
+customer_retry_limit: 5
+customer_retry_backoff_base: 1.0
+max_tool_iters: 6
