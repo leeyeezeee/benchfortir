@@ -16,7 +16,7 @@ cd "$ROOT"
 
 # infer.py 只接受配置文件名（stem），对应 src/config/<llm_config|dataset_config>/
 LLM_CONFIG="${LLM_CONFIG:-Qwen3_4B}"
-: "${DATASET_NAMES:=hotpotqa squadv2 }"
+: "${DATASET_NAMES:=math500}"
 : "${DATASET_NAMES_NOTOOL:=}"
 
 export VLLM_TOTAL_GPUS="${VLLM_TOTAL_GPUS:-4}"

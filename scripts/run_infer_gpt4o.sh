@@ -20,11 +20,9 @@ cd "$ROOT"
 LLM_CONFIG="${LLM_CONFIG:-gpt_5}"
 : "${DATASET_NAMES:=hotpotqa squadv2}"
 : "${DATASET_NAMES_NOTOOL:=}"
-MODEL_PATH="${MODEL_PATH:-/data/lyz/models/Qwen3-32B}"
 
 
 echo "[run_infer_gpt4o] LLM_CONFIG=$LLM_CONFIG"
-echo "[run_infer_gpt4o] MODEL_PATH=$MODEL_PATH"
 echo "[run_infer_gpt4o] DATASET_NAMES=$DATASET_NAMES"
 echo "[run_infer_gpt4o] Output path is inferred by infer.py (use_tool/model/dataset)."
 
@@ -33,7 +31,7 @@ for name in $DATASET_NAMES; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    with use_tool=true model_path="$MODEL_PATH"
+    with use_tool=true
 done
 
 for name in $DATASET_NAMES_NOTOOL; do
@@ -41,6 +39,6 @@ for name in $DATASET_NAMES_NOTOOL; do
   python infer.py \
     --llm_config "$LLM_CONFIG" \
     --dataset_config "$name" \
-    with use_tool=false model_path="$MODEL_PATH" \
+    with use_tool=false \
     2>/dev/null
 done
