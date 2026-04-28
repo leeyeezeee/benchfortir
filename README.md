@@ -1,4 +1,4 @@
-# 💡 TIRBench: A Benchmark for Tool-Integrated Reasoning
+<h1 id="tirbench-a-benchmark-for-tool-integrated-reasoning" style="color: black;">💡 TIRBench: A Benchmark for Tool-Integrated Reasoning</h1>
 
 <p align="center">
   <a href="#citation"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b"></a>
@@ -9,38 +9,24 @@
   <a href="#citation"><img alt="License" src="https://img.shields.io/badge/License-MIT-green"></a>
 </p>
 
-## [Overview](#overview)
+<h2 id="overview" style="color: black;">Overview</h2>
 
 TIRBench is a benchmark for evaluating whether large language models can solve math, QA, open-ended, and dynamic interaction tasks while using external tools effectively. It supports local vLLM deployment, OpenAI-compatible remote APIs, asynchronous inference, tool-augmented and no-tool settings, and task-specific evaluation. The main entry points are `deploy.py` for model deployment, `infer.py` for inference, and `evaluate.py` for evaluation.
 
 ![TIRBench framework and datasets](figs/frame.jpg)
 
-## [Table of Contents](#table-of-contents)
+<h2 id="table-of-contents" style="color: black;">Table of Contents</h2>
 
 - [Overview](#overview)
-- [Supported Datasets](#supported-datasets)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
+- [Supported Datasets](#supported-datasets)
 - [Metrics](#metrics)
 - [Reproducing Paper Results](#reproducing-paper-results)
+- [Acknowledgement](#acknowledgement)
 - [Citation](#citation)
 
-## [Supported Datasets](#supported-datasets)
-
-| Category | Dataset config | Data directory | Typical tools |
-| --- | --- | --- | --- |
-| Math | `math500` | `data/math/` | Python |
-| Math | `gsm8k500` | `data/gsm8k/` | Python |
-| Math | `omini500` | `data/omini/` | Python |
-| Natural Questions | `simpleqa` | `data/SimpleQA/` | Search, Python |
-| Natural Questions | `hotpotqa` | `data/hotpotqa/` | Search, Python |
-| Natural Questions | `squadv2` | `data/squadv2/` | Search, Python |
-| Open-ended | `expodesign` | `data/expodesign/` | Search, Python |
-| Dynamic interaction | `interaction` | `data/interaction/` | User-defined interaction tools |
-
-Additional data folders such as `aime24`, `aime25`, `2wiki`, `bamboogle`, `gaia`, `hle`, and `musique` are also included and can be connected by adding dataset YAML files under `src/config/dataset_config/`.
-
-## [Quick Start](#quick-start)
+<h2 id="quick-start" style="color: black;">Quick Start</h2>
 
 Create a clean Python environment and install dependencies.
 
@@ -85,7 +71,25 @@ python evaluate.py \
   with use_tool=true
 ```
 
-## [Configuration](#configuration)
+For QA datasets, you may need to deploy the [Local Search Server](LocalSearchServer/README.md). For example, run HotpotQA inference with local search as follows:
+
+```bash
+python infer.py \
+  --llm_config Qwen3_4B \
+  --dataset_config hotpotqa \
+  with use_tool=true use_local_search=true local_search_url="127.0.0.1:6006"
+```
+
+In addition to F1 score and accuracy, some evaluations can use a remote or local LLM judge. If you use a local judge, first deploy it with `deploy.py`, then set `use_llm=true` during evaluation. For example:
+
+```bash
+python evaluate.py \
+  --llm_config Qwen3_4B \
+  --dataset_config hotpotqa \
+  with use_tool=true use_llm=true api_base_url="http://127.0.0.1:8001/v1" model_name="Qwen3-4B" api_key="EMPTY"
+```
+
+<h2 id="configuration" style="color: black;">Configuration</h2>
 
 The benchmark uses YAML configuration files plus Sacred command-line overrides.
 
@@ -98,7 +102,7 @@ Configuration files are loaded in this order:
 
 Later values override earlier values.
 
-### [Model Configuration](#model-configuration)
+<h3 id="model-configuration" style="color: black;">Model Configuration</h3>
 
 Local vLLM model configs live in `src/config/llm_config/`. For example:
 
@@ -137,7 +141,7 @@ vllm:
 
 Do not commit private API keys to a public repository. Replace any placeholder keys in local configs before running experiments.
 
-### [Dataset Configuration](#dataset-configuration)
+<h3 id="dataset-configuration" style="color: black;">Dataset Configuration</h3>
 
 Dataset configs live in `src/config/dataset_config/`. A minimal math config looks like:
 
@@ -151,7 +155,7 @@ timeout: 18000
 
 The corresponding data files are under `data/`.
 
-### [Adding Configurations](#adding-configurations)
+<h3 id="adding-configurations" style="color: black;">Adding Configurations</h3>
 
 To add a new dataset, place the data under `data/<dataset_name>/` and add a dataset YAML file under `src/config/dataset_config/<dataset_config>.yaml`. At minimum, specify `dataset_name`, `prompt_type`, and `task`.
 
@@ -174,7 +178,22 @@ python infer.py \
   with use_tool=true max_python_times=5 max_search_times=3 max_read_times=3 sample_timeout=1200
 ```
 
-## [Metrics](#metrics)
+<h2 id="supported-datasets" style="color: black;">Supported Datasets</h2>
+
+| Category | Dataset config | Data directory | Typical tools |
+| --- | --- | --- | --- |
+| Math | `math500` | `data/math/` | Python |
+| Math | `gsm8k` | `data/gsm8k/` | Python |
+| Math | `omini` | `data/omini/` | Python |
+| Natural Questions | `simpleqa` | `data/SimpleQA/` | Search, Python |
+| Natural Questions | `hotpotqa` | `data/hotpotqa/` | Search, Python |
+| Natural Questions | `squadv2` | `data/squadv2/` | Search, Python |
+| Open-ended | `expodesign` | `data/expodesign/` | Search, Python |
+| Dynamic interaction | `interaction` | `data/interaction/` | User-defined interaction tools |
+
+Additional data folders such as `aime24`, `aime25`, `2wiki`, `bamboogle`, `gaia`, `hle`, and `musique` are also included and can be connected by adding dataset YAML files under `src/config/dataset_config/`.
+
+<h2 id="metrics" style="color: black;">Metrics</h2>
 
 The evaluator computes task-dependent correctness metrics and tool-use metrics. Depending on the task and available fields, outputs may include:
 
@@ -197,7 +216,7 @@ python evaluate.py \
   with use_tool=true tokenizer_path="/path/to/tokenizer_or_model"
 ```
 
-## [Reproducing Paper Results](#reproducing-paper-results)
+<h2 id="reproducing-paper-results" style="color: black;">Reproducing Paper Results</h2>
 
 For each reported model and dataset:
 
@@ -224,7 +243,11 @@ results/
         └── <dataset>_output_metrics_overall.json
 ```
 
-## [Citation](#citation)
+<h2 id="acknowledgement" style="color: black;">Acknowledgement</h2>
+
+This repository's implementation is inspired by [ARPO](https://github.com/RUC-NLPIR/ARPO/blob/main/README.md#-arpoaepo-evaluation). The local search service is adapted from [FlashRAG](https://github.com/RUC-NLPIR/FlashRAG/tree/main?tab=readme-ov-file#flashrag-a-python-toolkit-for-efficient-rag-research).
+
+<h2 id="citation" style="color: black;">Citation</h2>
 
 If you use this benchmark in your research, please cite our paper:
 
