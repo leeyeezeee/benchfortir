@@ -1,4 +1,4 @@
-<h1 id="local-search-server-for-qa"><a href="#local-search-server-for-qa">Local Search Server for QA</a></h1>
+<h1 id="local-search-service-deployment" style="color: black;"><a href="#local-search-service-deployment" style="color: black; text-decoration: none;">Local Search Service Deployment</a></h1>
 
 1. For tasks such as HotpotQA, a local Wikipedia retrieval service is required. We deploy the local retrieval service with FlashRAG and FastAPI. First, install the [FlashRAG environment](https://github.com/RUC-NLPIR/FlashRAG/tree/main?tab=readme-ov-file#wrench-installation). Then, install the additional dependencies required by this service in the same environment:
 
