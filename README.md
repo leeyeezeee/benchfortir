@@ -13,7 +13,7 @@
 
 TIRBench is a benchmark for evaluating whether large language models can solve math, QA, open-ended, and dynamic interaction tasks while using external tools effectively. It supports local vLLM deployment, OpenAI-compatible remote APIs, asynchronous inference, tool-augmented and no-tool settings, and task-specific evaluation. The main entry points are `deploy.py` for model deployment, `infer.py` for inference, and `evaluate.py` for evaluation.
 
-![TIRBench framework and datasets](figs/frame.jpg)
+![TIRBench framework and datasets](figs/tirbench-.png)
 
 <h2 id="table-of-contents" style="color: black;">Table of Contents</h2>
 
@@ -22,7 +22,7 @@ TIRBench is a benchmark for evaluating whether large language models can solve m
 - [Configuration](#configuration)
 - [Supported Datasets](#supported-datasets)
 - [Metrics](#metrics)
-- [Reproducing Paper Results](#reproducing-paper-results)
+- [Experiment Outputs](#experiment-outputs)
 - [Acknowledgement](#acknowledgement)
 - [Citation](#citation)
 
@@ -216,7 +216,7 @@ python evaluate.py \
   with use_tool=true tokenizer_path="/path/to/tokenizer_or_model"
 ```
 
-<h2 id="reproducing-paper-results" style="color: black;">Reproducing Paper Results</h2>
+<h2 id="experiment-outputs" style="color: black;">Experiment Outputs</h2>
 
 For each reported model and dataset:
 
