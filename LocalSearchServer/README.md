@@ -1,12 +1,12 @@
-<h1 id="local-search-service-deployment" style="color: black;">Local Search Service Deployment</h1>
+# Local Search Service Deployment
 
-1. For tasks such as HotpotQA, a local Wikipedia retrieval service is required. We deploy the local retrieval service with FlashRAG and FastAPI. First, install the [FlashRAG environment](https://github.com/RUC-NLPIR/FlashRAG/tree/main?tab=readme-ov-file#wrench-installation). Then, install the additional dependencies required by this service in the same environment:
+For tasks such as HotpotQA, a local Wikipedia retrieval service is required. We deploy the local retrieval service with FlashRAG and FastAPI. First, install the [FlashRAG environment](https://github.com/RUC-NLPIR/FlashRAG/tree/main?tab=readme-ov-file#wrench-installation). Then, install the additional dependencies required by this service in the same environment:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Enter the corresponding environment, then download the [Wikipedia corpus](https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets/tree/main/retrieval-corpus) and [corresponding retriever models](https://github.com/RUC-NLPIR/FlashRAG/blob/main/docs/original_docs/reproduce_experiment.md#preliminary). The index construction method can be found [here](https://github.com/RUC-NLPIR/FlashRAG/tree/main?tab=readme-ov-file#rocket-quick-start), or you can directly download the [pre-indexed Wikipedia](https://www.modelscope.cn/datasets/hhjinjiajie/FlashRAG_Dataset/file/view/master?id=47985&status=2&fileName=retrieval_corpus%252Fwiki18_100w_e5_index.zip).
+Enter the corresponding environment, then download the [Wikipedia corpus](https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets/tree/main/retrieval-corpus) and [corresponding retriever models](https://github.com/RUC-NLPIR/FlashRAG/blob/main/docs/original_docs/reproduce_experiment.md#preliminary). The index construction method can be found [here](https://github.com/RUC-NLPIR/FlashRAG/tree/main?tab=readme-ov-file#rocket-quick-start), or you can directly download the [pre-indexed Wikipedia](https://www.modelscope.cn/datasets/hhjinjiajie/FlashRAG_Dataset/file/view/master?id=47985&status=2&fileName=retrieval_corpus%252Fwiki18_100w_e5_index.zip).
 
 More details can be found in the [FlashRAG documentation](https://github.com/RUC-NLPIR/FlashRAG/tree/main?tab=readme-ov-file#rocket-quick-start).
 
