@@ -4,7 +4,7 @@
 #   results/tool|notool/<llm_name>/<dataset_name>_output.json
 # 若推理目录不遵循该约定，请在命令中手动覆盖 --output_path
 # Token 统计：与推理模型 tokenizer 一致（可与 infer 的 llm_config model_path 对齐），例如：
-#   TOKENIZER_PATH=/root/autodl-tmp/models/Qwen3-30B ./evaluate.sh
+#   TOKENIZER_PATH=/path/to/models/Qwen3-30B ./evaluate.sh
 # 不需要 token 统计时：TOKENIZER_PATH= ./evaluate.sh
 set -euo pipefail
 

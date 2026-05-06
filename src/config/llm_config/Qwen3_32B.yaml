@@ -1,5 +1,5 @@
 llm_name: qwen3_32b
-model_path: /data/lyz/models/Qwen3-32B
+model_path: /path/to/models/Qwen3-32B
 default_model: Qwen3-32B
 max_tokens: 2048
 max_concurrent_requests: 8

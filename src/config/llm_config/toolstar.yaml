@@ -1,5 +1,5 @@
 llm_name: toolstar
-model_path: /data/lyz/models/Tool-Star-Qwen-7B
+model_path: /path/to/models/Tool-Star-Qwen-7B
 default_model: Tool-Star-Qwen-7B
 temperature: 0.7
 max_tokens: 3072

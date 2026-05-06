@@ -5,6 +5,5 @@ max_concurrent_requests: 8
 vllm:
   remote: true
   endpoints:
-    - https://halogg.cn/v1
-  api_keys:
-    - "sk-JmQ5Ke0KByoTjfCGHk44Avere8avSv5fTQPyHayIQ0N7aV18"
+    - https://your-api-endpoint/v1
+  api_keys: []

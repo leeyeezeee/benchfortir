@@ -1,5 +1,5 @@
 llm_name: qwen3_8b
-model_path: /data/lyz/models/Qwen3-8B
+model_path: /path/to/models/Qwen3-8B
 default_model: Qwen3-8B
 temperature: 0.1
 max_tokens: 2048

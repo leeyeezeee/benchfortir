@@ -21,7 +21,7 @@ max_python_times: 5
 max_search_times: 3
 max_read_times: 3
 sample_timeout: 1200
-conda_path: /home/lyz/miniconda3
+conda_path: /path/to/miniconda3
 conda_env: tool
 python_max_concurrent: 32
 read_allowed_roots: null
@@ -31,7 +31,7 @@ read_enable_ocr: false
 use_local_search: false
 local_search_url: 127.0.0.1:6006
 compatible_search: true
-bing_api_key: "1fe0c252-f2e3-40b2-8e9b-096e74e60465"
+bing_api_key: ""
 bing_zone: serp_api2
 search_max_results: 10
 search_result_length: 1000
@@ -51,7 +51,7 @@ use_sds: false
 use_llm: true
 api_base_url: https://api.moonshot.cn/v1
 model_name: kimi-k2-0905-preview
-api_key: sk-IvXK1GcIhwXbaCm62ceqcsUVB1qNbB8upHnhzOOgGVgd5Txq
+api_key: ""
 concurrent_limit: 50
 timeout: 1800
 tokenizer_path: null
